@@ -17,7 +17,7 @@ export default function GamePage() {
   const roomCode = (params.roomCode as string)?.toUpperCase();
   const {
     state, dispatch, startGame, callNumber, markNumber,
-    setActiveTicket, setMySheetType, submitClaim, leaveRoom, sheetProgress,
+    setActiveTicket, setMySheetType, toggleVoice, submitClaim, leaveRoom, sheetProgress,
   } = useGame();
   const [autoCallActive, setAutoCallActive] = useState(false);
   const autoCallRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -137,6 +137,13 @@ export default function GamePage() {
           </div>
         </div>
         <div className={styles.topRight}>
+          <button 
+            className={styles.voiceToggle} 
+            onClick={toggleVoice}
+            title={state.voiceEnabled ? 'Disable Voice' : 'Enable Voice'}
+          >
+            {state.voiceEnabled ? '🔊' : '🔇'}
+          </button>
           {state.sheet && (
             <span className={styles.sheetBadge}>
               {state.sheet.type === 'full' ? '📄 Full Sheet' : '📋 Half Sheet'}

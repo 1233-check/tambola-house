@@ -23,6 +23,7 @@ interface AppState {
   mySheetType: SheetType;
 
   /* Game */
+  voiceEnabled: boolean;
   status: GameStatus;
   players: Player[];
   sheet: TambolaSheet | null;
@@ -48,6 +49,7 @@ const initialState: AppState = {
   gameId: null,
   isHost: false,
   mySheetType: 'full',
+  voiceEnabled: true,
   status: 'LOBBY',
   players: [],
   sheet: null,
@@ -80,6 +82,7 @@ type Action =
   | { type: 'NUMBER_CALLED'; number: number }
   | { type: 'MARK_NUMBER'; number: number }
   | { type: 'UNMARK_NUMBER'; number: number }
+  | { type: 'TOGGLE_VOICE' }
   | { type: 'CLAIM_RESULT'; event: ClaimEvent }
   | { type: 'SET_SETTINGS'; settings: Partial<GameState['settings']> }
   | { type: 'SET_LOADING'; loading: boolean }
@@ -125,6 +128,8 @@ function reducer(state: AppState, action: Action): AppState {
       newUnmarked.delete(action.number);
       return { ...state, markedNumbers: newUnmarked };
     }
+    case 'TOGGLE_VOICE':
+      return { ...state, voiceEnabled: !state.voiceEnabled };
     case 'CLAIM_RESULT': {
       const newClaimed = { ...state.claimedPatterns };
       if (action.event.isValid) {
@@ -173,6 +178,7 @@ interface GameContextValue {
   markNumber: (num: number) => void;
   setActiveTicket: (index: number) => void;
   setMySheetType: (sheetType: SheetType) => void;
+  toggleVoice: () => void;
   submitClaim: (pattern: PatternName, ticketIndex?: number) => Promise<ClaimResultValue | null>;
   leaveRoom: () => void;
 
@@ -206,6 +212,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, []);
+
+  /* Speech Synthesis for Called Numbers */
+  useEffect(() => {
+    const num = state.currentNumber;
+    if (state.voiceEnabled && num !== null && typeof window !== 'undefined' && window.speechSynthesis) {
+      // Small delay so it feels natural
+      const timer = setTimeout(() => {
+        // Cancel any ongoing speech so they don't pile up if numbers are called fast
+        window.speechSynthesis.cancel();
+        
+        const text = num.toString();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.85; // slightly slower for clarity
+        utterance.pitch = 1.1; 
+        window.speechSynthesis.speak(utterance);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [state.currentNumber, state.voiceEnabled]);
 
   /* Subscribe to Realtime channel for a room */
   const subscribeToRoom = useCallback((roomCode: string) => {
@@ -423,6 +448,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  /* --- Toggle Voice --- */
+  const toggleVoice = useCallback(() => {
+    dispatch({ type: 'TOGGLE_VOICE' });
+  }, []);
+
   /* --- Submit Claim --- */
   const submitClaim = useCallback(async (pattern: PatternName, ticketIndex?: number): Promise<ClaimResultValue | null> => {
     if (!state.sheet || !state.playerId) return null;
@@ -484,6 +514,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     markNumber,
     setActiveTicket,
     setMySheetType,
+    toggleVoice,
     submitClaim,
     leaveRoom,
     sheetProgress,
