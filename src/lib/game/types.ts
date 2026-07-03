@@ -11,7 +11,6 @@ export interface GameSettings {
   autoCall: boolean;
   callIntervalMs: number; // 3000 – 10000
   patterns: PatternName[];
-  sheetType: SheetType; // 'full' (6 tickets) or 'half' (3 tickets)
 }
 
 export interface Player {
@@ -20,6 +19,7 @@ export interface Player {
   avatarUrl?: string;
   isHost: boolean;
   isOnline: boolean;
+  sheetType?: SheetType; // each player picks their own sheet type
 }
 
 export interface PlayerSheet {
@@ -53,5 +53,4 @@ export const DEFAULT_SETTINGS: GameSettings = {
   autoCall: false,
   callIntervalMs: 5000,
   patterns: ['Early Five', 'Top Line', 'Middle Line', 'Bottom Line', 'Four Corners', 'Full House'],
-  sheetType: 'full',
 };

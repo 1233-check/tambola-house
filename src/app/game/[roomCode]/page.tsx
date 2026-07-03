@@ -17,7 +17,7 @@ export default function GamePage() {
   const roomCode = (params.roomCode as string)?.toUpperCase();
   const {
     state, dispatch, startGame, callNumber, markNumber,
-    setActiveTicket, submitClaim, leaveRoom, sheetProgress,
+    setActiveTicket, setMySheetType, submitClaim, leaveRoom, sheetProgress,
   } = useGame();
   const [autoCallActive, setAutoCallActive] = useState(false);
   const autoCallRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -28,11 +28,12 @@ export default function GamePage() {
     if (!state.roomCode && roomCode) {
       const playerId = `player_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       dispatch({ type: 'SET_PLAYER', playerId, playerName: 'Host' });
+      dispatch({ type: 'SET_MY_SHEET_TYPE', sheetType: 'full' });
       dispatch({ type: 'SET_ROOM', roomCode, gameId: `demo_${roomCode}`, isHost: true });
-      const sheet = generateSheet(state.settings.sheetType);
+      const sheet = generateSheet('full');
       dispatch({ type: 'SET_SHEET', sheet });
     }
-  }, [roomCode, state.roomCode, dispatch, state.settings.sheetType]);
+  }, [roomCode, state.roomCode, dispatch]);
 
   // Auto-call logic
   useEffect(() => {
@@ -64,11 +65,11 @@ export default function GamePage() {
 
   const handleStartGame = useCallback(async () => {
     if (!state.sheet) {
-      const sheet = generateSheet(state.settings.sheetType);
+      const sheet = generateSheet(state.mySheetType);
       dispatch({ type: 'SET_SHEET', sheet });
     }
     await startGame();
-  }, [startGame, state.sheet, state.settings.sheetType, dispatch]);
+  }, [startGame, state.sheet, state.mySheetType, dispatch]);
 
   const handleCallNumber = useCallback(async () => {
     const num = await callNumber();
@@ -95,11 +96,8 @@ export default function GamePage() {
   }, [dispatch]);
 
   const handleSheetTypeChange = useCallback((type: SheetType) => {
-    dispatch({ type: 'SET_SETTINGS', settings: { sheetType: type } });
-    // Regenerate sheet with new type
-    const sheet = generateSheet(type);
-    dispatch({ type: 'SET_SHEET', sheet });
-  }, [dispatch]);
+    setMySheetType(type);
+  }, [setMySheetType]);
 
   const allPatternsClaimed = state.settings.patterns.every(p => state.claimedPatterns[p]);
   const ticketCount = state.sheet?.tickets.length ?? 0;
@@ -177,30 +175,30 @@ export default function GamePage() {
                 </div>
               )}
 
-              {state.isHost && (
-                <div className={styles.lobbySettings}>
-                  {/* Sheet Type Selector */}
-                  <div className={styles.settingRow}>
-                    <span className={styles.settingLabel}>Sheet Type:</span>
-                    <div className={styles.sheetTypeToggle}>
-                      <button
-                        className={`${styles.sheetTypeBtn} ${state.settings.sheetType === 'full' ? styles.sheetTypeActive : ''}`}
-                        onClick={() => handleSheetTypeChange('full')}
-                      >
-                        📄 Full Sheet
-                        <span className={styles.sheetTypeDesc}>6 tickets · All 90 numbers</span>
-                      </button>
-                      <button
-                        className={`${styles.sheetTypeBtn} ${state.settings.sheetType === 'half' ? styles.sheetTypeActive : ''}`}
-                        onClick={() => handleSheetTypeChange('half')}
-                      >
-                        📋 Half Sheet
-                        <span className={styles.sheetTypeDesc}>3 tickets · 45 numbers</span>
-                      </button>
-                    </div>
+              <div className={styles.lobbySettings}>
+                {/* Sheet Type Selector (Available to all players) */}
+                <div className={styles.settingRow}>
+                  <span className={styles.settingLabel}>Your Sheet:</span>
+                  <div className={styles.sheetTypeToggle}>
+                    <button
+                      className={`${styles.sheetTypeBtn} ${state.mySheetType === 'full' ? styles.sheetTypeActive : ''}`}
+                      onClick={() => handleSheetTypeChange('full')}
+                    >
+                      📄 Full Sheet
+                      <span className={styles.sheetTypeDesc}>6 tickets · All 90 numbers</span>
+                    </button>
+                    <button
+                      className={`${styles.sheetTypeBtn} ${state.mySheetType === 'half' ? styles.sheetTypeActive : ''}`}
+                      onClick={() => handleSheetTypeChange('half')}
+                    >
+                      📋 Half Sheet
+                      <span className={styles.sheetTypeDesc}>3 tickets · 45 numbers</span>
+                    </button>
                   </div>
+                </div>
 
-                  {/* Call Speed */}
+                {/* Call Speed (Host Only) */}
+                {state.isHost && (
                   <div className={styles.settingRow}>
                     <label className={styles.settingLabel}>
                       Call Speed:
@@ -216,8 +214,8 @@ export default function GamePage() {
                       </select>
                     </label>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {state.isHost && (
                 <button

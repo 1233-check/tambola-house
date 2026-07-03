@@ -96,6 +96,12 @@
   font-weight: 600;
 }
 
+.sheetBadge {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 .statusDot {
   width: 8px;
   height: 8px;

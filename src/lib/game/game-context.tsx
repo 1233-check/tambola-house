@@ -19,11 +19,14 @@ interface AppState {
   gameId: string | null;
   isHost: boolean;
 
+  /* Per-player sheet choice */
+  mySheetType: SheetType;
+
   /* Game */
   status: GameStatus;
   players: Player[];
   sheet: TambolaSheet | null;
-  activeTicketIndex: number; // which ticket in the sheet the player is viewing
+  activeTicketIndex: number;
   calledNumbers: number[];
   currentNumber: number | null;
   markedNumbers: Set<number>;
@@ -44,6 +47,7 @@ const initialState: AppState = {
   roomCode: null,
   gameId: null,
   isHost: false,
+  mySheetType: 'full',
   status: 'LOBBY',
   players: [],
   sheet: null,
@@ -55,7 +59,6 @@ const initialState: AppState = {
   settings: {
     autoCall: false,
     callIntervalMs: 5000,
-    sheetType: 'full',
     patterns: ['Early Five', 'Top Line', 'Middle Line', 'Bottom Line', 'Four Corners', 'Full House'],
   },
   events: [],
@@ -72,6 +75,7 @@ type Action =
   | { type: 'PLAYER_JOINED'; player: Player }
   | { type: 'PLAYER_LEFT'; playerId: string }
   | { type: 'SET_SHEET'; sheet: TambolaSheet }
+  | { type: 'SET_MY_SHEET_TYPE'; sheetType: SheetType }
   | { type: 'SET_ACTIVE_TICKET'; index: number }
   | { type: 'NUMBER_CALLED'; number: number }
   | { type: 'MARK_NUMBER'; number: number }
@@ -100,6 +104,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, players: state.players.filter(p => p.id !== action.playerId) };
     case 'SET_SHEET':
       return { ...state, sheet: action.sheet, activeTicketIndex: 0 };
+    case 'SET_MY_SHEET_TYPE':
+      return { ...state, mySheetType: action.sheetType, sheet: null, activeTicketIndex: 0 };
     case 'SET_ACTIVE_TICKET':
       return { ...state, activeTicketIndex: action.index };
     case 'NUMBER_CALLED':
@@ -109,15 +115,17 @@ function reducer(state: AppState, action: Action): AppState {
         calledNumbers: [...state.calledNumbers, action.number],
         currentNumber: action.number,
       };
-    case 'MARK_NUMBER':
+    case 'MARK_NUMBER': {
       const newMarked = new Set(state.markedNumbers);
       newMarked.add(action.number);
       return { ...state, markedNumbers: newMarked };
-    case 'UNMARK_NUMBER':
+    }
+    case 'UNMARK_NUMBER': {
       const newUnmarked = new Set(state.markedNumbers);
       newUnmarked.delete(action.number);
       return { ...state, markedNumbers: newUnmarked };
-    case 'CLAIM_RESULT':
+    }
+    case 'CLAIM_RESULT': {
       const newClaimed = { ...state.claimedPatterns };
       if (action.event.isValid) {
         newClaimed[action.event.patternName] = {
@@ -130,6 +138,7 @@ function reducer(state: AppState, action: Action): AppState {
         claimedPatterns: newClaimed,
         events: [action.event, ...state.events].slice(0, 50),
       };
+    }
     case 'SET_SETTINGS':
       return { ...state, settings: { ...state.settings, ...action.settings } };
     case 'SET_LOADING':
@@ -158,11 +167,12 @@ interface GameContextValue {
 
   /* Actions */
   createRoom: (playerName: string, sheetType?: SheetType) => Promise<string>;
-  joinRoom: (roomCode: string, playerName: string) => Promise<void>;
+  joinRoom: (roomCode: string, playerName: string, sheetType?: SheetType) => Promise<void>;
   startGame: () => Promise<void>;
   callNumber: () => Promise<number | null>;
   markNumber: (num: number) => void;
   setActiveTicket: (index: number) => void;
+  setMySheetType: (sheetType: SheetType) => void;
   submitClaim: (pattern: PatternName, ticketIndex?: number) => Promise<ClaimResultValue | null>;
   leaveRoom: () => void;
 
@@ -248,6 +258,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             user_id: string;
             display_name: string;
             is_host: boolean;
+            sheet_type?: SheetType;
           }>;
           for (const entry of entries) {
             players.push({
@@ -255,6 +266,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
               displayName: entry.display_name,
               isHost: entry.is_host,
               isOnline: true,
+              sheetType: entry.sheet_type,
             });
           }
         }
@@ -266,12 +278,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             user_id: state.playerId,
             display_name: state.playerName,
             is_host: state.isHost,
+            sheet_type: state.mySheetType,
           });
         }
       });
 
     channelRef.current = channel;
-  }, [state.playerId, state.playerName, state.isHost]);
+  }, [state.playerId, state.playerName, state.isHost, state.mySheetType]);
 
   /* --- Create Room --- */
   const createRoom = useCallback(async (playerName: string, sheetType: SheetType = 'full'): Promise<string> => {
@@ -281,11 +294,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     try {
       const playerId = `player_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       dispatch({ type: 'SET_PLAYER', playerId, playerName });
+      dispatch({ type: 'SET_MY_SHEET_TYPE', sheetType });
 
       const roomCode = Math.random().toString(36).slice(2, 8).toUpperCase();
       const gameId = `game_${Date.now()}`;
 
-      dispatch({ type: 'SET_SETTINGS', settings: { sheetType } });
       dispatch({ type: 'SET_ROOM', roomCode, gameId, isHost: true });
 
       try {
@@ -312,20 +325,21 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /* --- Join Room --- */
-  const joinRoom = useCallback(async (roomCode: string, playerName: string): Promise<void> => {
+  const joinRoom = useCallback(async (roomCode: string, playerName: string, sheetType: SheetType = 'full'): Promise<void> => {
     dispatch({ type: 'SET_LOADING', loading: true });
     dispatch({ type: 'SET_ERROR', error: null });
 
     try {
       const playerId = `player_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       dispatch({ type: 'SET_PLAYER', playerId, playerName });
+      dispatch({ type: 'SET_MY_SHEET_TYPE', sheetType });
 
       const gameId = `game_joined_${roomCode}`;
       dispatch({ type: 'SET_ROOM', roomCode, gameId, isHost: false });
 
-      // Generate sheet for this player
+      // Generate sheet for this player based on their choice
       const { generateSheet } = await import('@/lib/game/ticket-generator');
-      const sheet = generateSheet(state.settings.sheetType);
+      const sheet = generateSheet(sheetType);
       dispatch({ type: 'SET_SHEET', sheet });
 
       subscribeToRoom(roomCode);
@@ -335,7 +349,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     } finally {
       dispatch({ type: 'SET_LOADING', loading: false });
     }
-  }, [subscribeToRoom, state.settings.sheetType]);
+  }, [subscribeToRoom]);
 
   /* --- Start Game --- */
   const startGame = useCallback(async (): Promise<void> => {
@@ -343,10 +357,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     dispatch({ type: 'SET_STATUS', status: 'IN_PROGRESS' });
 
-    // Generate sheet for host too
+    // Generate sheet for host if not already done
     if (!state.sheet) {
       const { generateSheet } = await import('@/lib/game/ticket-generator');
-      const sheet = generateSheet(state.settings.sheetType);
+      const sheet = generateSheet(state.mySheetType);
       dispatch({ type: 'SET_SHEET', sheet });
     }
 
@@ -357,7 +371,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         payload: {},
       });
     }
-  }, [state.isHost, state.roomCode, state.sheet, state.settings.sheetType]);
+  }, [state.isHost, state.roomCode, state.sheet, state.mySheetType]);
 
   /* --- Call Number --- */
   const callNumber = useCallback(async (): Promise<number | null> => {
@@ -397,6 +411,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   /* --- Set Active Ticket --- */
   const setActiveTicket = useCallback((index: number) => {
     dispatch({ type: 'SET_ACTIVE_TICKET', index });
+  }, []);
+
+  /* --- Set My Sheet Type (can be changed in lobby before game starts) --- */
+  const setMySheetType = useCallback((sheetType: SheetType) => {
+    dispatch({ type: 'SET_MY_SHEET_TYPE', sheetType });
+    // Regenerate sheet with new type
+    import('@/lib/game/ticket-generator').then(({ generateSheet }) => {
+      const sheet = generateSheet(sheetType);
+      dispatch({ type: 'SET_SHEET', sheet });
+    });
   }, []);
 
   /* --- Submit Claim --- */
@@ -459,6 +483,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     callNumber,
     markNumber,
     setActiveTicket,
+    setMySheetType,
     submitClaim,
     leaveRoom,
     sheetProgress,

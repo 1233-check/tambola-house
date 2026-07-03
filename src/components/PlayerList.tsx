@@ -61,6 +61,12 @@ export default function PlayerList({ players, currentPlayerId }: PlayerListProps
                 {player.isHost && (
                   <span className={styles.hostBadge}>👑 Host</span>
                 )}
+                {player.sheetType === 'full' && (
+                  <span className={styles.sheetBadge} title="Full Sheet (6 tickets)">📄 Full</span>
+                )}
+                {player.sheetType === 'half' && (
+                  <span className={styles.sheetBadge} title="Half Sheet (3 tickets)">📋 Half</span>
+                )}
               </div>
               <div
                 className={`${styles.statusDot} ${player.isOnline ? styles.online : styles.offline}`}

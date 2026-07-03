@@ -45,7 +45,7 @@ export default function HomePage() {
     setLoading(true);
     setError(null);
     try {
-      await joinRoom(roomCode.trim().toUpperCase(), playerName.trim());
+      await joinRoom(roomCode.trim().toUpperCase(), playerName.trim(), sheetType);
       router.push(`/game/${roomCode.trim().toUpperCase()}`);
     } catch (err) {
       setError((err as Error).message);
@@ -201,6 +201,29 @@ export default function HomePage() {
                   maxLength={6}
                   onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
                 />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.inputLabel}>Sheet Type</label>
+                <div className={styles.sheetTypeSelector}>
+                  <button
+                    className={`${styles.sheetOption} ${sheetType === 'full' ? styles.sheetOptionActive : ''}`}
+                    onClick={() => setSheetType('full')}
+                    type="button"
+                  >
+                    <span className={styles.sheetOptionIcon}>📄</span>
+                    <span className={styles.sheetOptionTitle}>Full Sheet</span>
+                    <span className={styles.sheetOptionDesc}>6 tickets · All 90 numbers</span>
+                  </button>
+                  <button
+                    className={`${styles.sheetOption} ${sheetType === 'half' ? styles.sheetOptionActive : ''}`}
+                    onClick={() => setSheetType('half')}
+                    type="button"
+                  >
+                    <span className={styles.sheetOptionIcon}>📋</span>
+                    <span className={styles.sheetOptionTitle}>Half Sheet</span>
+                    <span className={styles.sheetOptionDesc}>3 tickets · 45 numbers</span>
+                  </button>
+                </div>
               </div>
               {error && <p className={styles.error}>{error}</p>}
               <div className={styles.formActions}>
