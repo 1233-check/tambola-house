@@ -1,0 +1,263 @@
+.loadingPage {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-md);
+  color: var(--text-muted);
+}
+
+.errorText {
+  font-size: 0.9rem;
+  color: var(--error);
+}
+
+.page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: 500px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.headerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.playerName {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.gameMeta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.voiceBtn {
+  background: none;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.voiceBtn:hover {
+  border-color: var(--border-strong);
+}
+
+/* Current Number Banner */
+.currentBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.currentLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+.currentNum {
+  font-size: 2.5rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.calledCount {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Waiting Banner */
+.waitingBanner {
+  text-align: center;
+  padding: var(--space-xl) var(--space-md);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tab {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border-bottom: 2px solid transparent;
+}
+
+.tabActive {
+  color: var(--text-primary);
+  border-bottom-color: #ffffff;
+}
+
+/* Progress */
+.progress {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-sm);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Ticket Grid */
+.ticketGrid {
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ticketRow {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 2px;
+}
+
+.ticketCellEmpty {
+  aspect-ratio: 1.2;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.ticketCell {
+  aspect-ratio: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.ticketCell:disabled {
+  cursor: default;
+}
+
+.ticketCellCalled {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.ticketCellMarked {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+}
+
+.ticketCellCalled.ticketCellMarked {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+}
+
+/* Claims */
+.claims {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.claimGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-sm);
+}
+
+.claimBtn {
+  padding: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.claimBtn:hover {
+  border-color: #ffffff;
+}
+
+.claimBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.claimWon {
+  border-color: var(--success);
+  color: var(--success);
+  background: rgba(74, 222, 128, 0.05);
+}
+
+.claimFailed {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+/* Responsive */
+@media (max-width: 400px) {
+  .ticketCell {
+    font-size: 0.75rem;
+  }
+
+  .currentNum {
+    font-size: 2rem;
+  }
+}

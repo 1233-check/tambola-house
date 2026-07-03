@@ -1,56 +1,46 @@
 /**
- * Game types shared across frontend and backend.
+ * Tambola House — Data Types
  */
 
 import type { TambolaTicket, TambolaSheet, SheetType } from './ticket-generator';
 import type { PatternName } from './claim-validator';
 
-export type GameStatus = 'LOBBY' | 'IN_PROGRESS' | 'COMPLETED';
+export type GameStatus = 'UPCOMING' | 'LIVE' | 'COMPLETED';
 
-export interface GameSettings {
-  autoCall: boolean;
-  callIntervalMs: number; // 3000 – 10000
-  patterns: PatternName[];
-}
-
-export interface Player {
+export interface Game {
   id: string;
-  displayName: string;
-  avatarUrl?: string;
-  isHost: boolean;
-  isOnline: boolean;
-  sheetType?: SheetType; // each player picks their own sheet type
-}
-
-export interface PlayerSheet {
-  sheet: TambolaSheet;
-  markedNumbers: number[];
-}
-
-export interface ClaimEvent {
-  playerId: string;
-  playerName: string;
-  patternName: PatternName;
-  ticketIndex: number; // which ticket in the sheet the claim is for
-  isValid: boolean;
-  timestamp: string;
-}
-
-export interface GameState {
-  roomCode: string;
-  gameId: string;
+  game_number: number;         // 1–20
+  date: string;                // YYYY-MM-DD
   status: GameStatus;
-  hostId: string;
-  calledNumbers: number[];
-  currentNumber: number | null;
-  players: Player[];
-  claimedPatterns: Record<string, { winnerId: string; winnerName: string }>;
-  settings: GameSettings;
+  called_numbers: number[];
+  number_sequence: number[];   // pre-shuffled 1-90 (admin-only)
+  created_at: string;
 }
 
-/** Default game settings */
-export const DEFAULT_SETTINGS: GameSettings = {
-  autoCall: false,
-  callIntervalMs: 5000,
-  patterns: ['Early Five', 'Top Line', 'Middle Line', 'Bottom Line', 'Four Corners', 'Full House'],
-};
+export interface Ticket {
+  id: string;
+  game_id: string;
+  player_name: string;
+  player_phone: string;
+  sheet_type: SheetType;       // 'full' or 'half'
+  ticket_data: TambolaSheet;   // the actual ticket grids
+  access_token: string;        // UUID — used in the player URL
+  created_at: string;
+}
+
+export interface Claim {
+  id: string;
+  ticket_id: string;
+  game_id: string;
+  pattern: PatternName;
+  ticket_index: number;        // which ticket in the sheet
+  is_valid: boolean;
+  player_name: string;
+  validated_at: string;
+}
+
+/** Game with its tickets and claims */
+export interface GameDetail extends Game {
+  tickets: Ticket[];
+  claims: Claim[];
+}

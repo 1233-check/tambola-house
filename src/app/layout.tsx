@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { GameProvider } from "@/lib/game/game-context";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -20,18 +19,18 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   viewportFit: "cover",
-  themeColor: "#0a0e1a",
+  themeColor: "#000000",
 };
 
 export const metadata: Metadata = {
-  title: "Tambola | Play Online Housie with Friends",
+  title: "Tambola House | Online Housie Platform",
   description:
-    "Play Tambola (Housie / Indian Bingo) online with friends and family. Create a room, share the code, and enjoy the classic number game — free, no download required.",
-  keywords: ["tambola", "housie", "bingo", "online game", "multiplayer"],
+    "Play Tambola (Housie) online. Real-time number calling, automatic ticket validation, and instant claim verification.",
+  keywords: ["tambola", "housie", "bingo", "online game", "tickets"],
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Tambola",
+    statusBarStyle: "black",
+    title: "Tambola House",
   },
 };
 
@@ -42,9 +41,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body>
-        <GameProvider>{children}</GameProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
