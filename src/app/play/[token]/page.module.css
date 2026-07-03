@@ -20,6 +20,8 @@
   max-width: 500px;
   margin: 0 auto;
   width: 100%;
+  position: relative;
+  padding-bottom: 180px; /* Leave space for sticky claims bar at bottom */
 }
 
 /* Header */
@@ -29,6 +31,7 @@
   justify-content: space-between;
   padding: var(--space-md);
   border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
 }
 
 .headerInfo {
@@ -38,12 +41,12 @@
 }
 
 .playerName {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 700;
 }
 
 .gameMeta {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
 }
@@ -58,8 +61,8 @@
   background: none;
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -72,7 +75,7 @@
   border-color: var(--border-strong);
 }
 
-/* Current Number Banner */
+/* Current Number Banner (Sticky Top) */
 .currentBanner {
   display: flex;
   align-items: center;
@@ -80,6 +83,11 @@
   gap: var(--space-lg);
   padding: var(--space-md);
   border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 .currentLabel {
@@ -94,10 +102,11 @@
   font-weight: 800;
   font-family: var(--font-mono);
   line-height: 1;
+  color: #ffffff;
 }
 
 .calledCount {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
 }
@@ -111,63 +120,68 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-/* Tabs */
-.tabs {
+/* Vertical Scrollable Tickets List */
+.ticketsList {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-md);
+}
+
+.ticketCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.ticketHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-xs);
 }
 
-.tab {
-  flex: 1;
-  padding: var(--space-sm) var(--space-md);
+.ticketTitle {
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--font-mono);
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  border-bottom: 2px solid transparent;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
 }
 
-.tabActive {
-  color: var(--text-primary);
-  border-bottom-color: #ffffff;
-}
-
-/* Progress */
-.progress {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-sm);
+.ticketProgress {
   font-size: 0.7rem;
-  color: var(--text-muted);
   font-family: var(--font-mono);
+  color: var(--text-muted);
 }
 
 /* Ticket Grid */
 .ticketGrid {
-  padding: var(--space-sm) var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .ticketRow {
   display: grid;
   grid-template-columns: repeat(9, 1fr);
-  gap: 2px;
+  gap: 3px;
 }
 
 .ticketCellEmpty {
-  aspect-ratio: 1.2;
+  aspect-ratio: 1.15;
   background: var(--bg-secondary);
   border-radius: var(--radius-sm);
 }
 
 .ticketCell {
-  aspect-ratio: 1.2;
+  aspect-ratio: 1.15;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -189,7 +203,7 @@
 
 .ticketCellCalled {
   background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .ticketCellMarked {
@@ -202,24 +216,43 @@
   background: #ffffff;
   color: #000000;
   border-color: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
 }
 
-/* Claims */
+/* Claims Bar (Sticky Bottom) */
 .claims {
   padding: var(--space-md);
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 500px;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-medium);
+  z-index: 40;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.85);
+}
+
+.claimsLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 .claimGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-sm);
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-xs);
 }
 
 .claimBtn {
-  padding: 10px;
+  padding: 10px 6px;
   font-size: 0.75rem;
   font-weight: 600;
   font-family: var(--font-sans);
@@ -229,10 +262,15 @@
   color: var(--text-primary);
   cursor: pointer;
   transition: all var(--transition-fast);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .claimBtn:hover {
   border-color: #ffffff;
+  background: var(--bg-card-hover);
 }
 
 .claimBtn:disabled {
@@ -243,7 +281,7 @@
 .claimWon {
   border-color: var(--success);
   color: var(--success);
-  background: rgba(74, 222, 128, 0.05);
+  background: rgba(74, 222, 128, 0.08);
 }
 
 .claimFailed {
@@ -258,6 +296,11 @@
   }
 
   .currentNum {
-    font-size: 2rem;
+    font-size: 2.2rem;
+  }
+
+  .claimBtn {
+    font-size: 0.68rem;
+    padding: 8px 4px;
   }
 }

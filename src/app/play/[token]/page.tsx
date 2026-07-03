@@ -37,7 +37,6 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
   const [game, setGame] = useState<GameInfo | null>(null);
   const [calledNumbers, setCalledNumbers] = useState<number[]>([]);
   const [markedNumbers, setMarkedNumbers] = useState<Set<number>>(new Set());
-  const [activeTab, setActiveTab] = useState(0);
   const [claimStatus, setClaimStatus] = useState<Record<string, { status: string; message: string }>>({});
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -126,7 +125,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
     }
   }, [calledNumbers, voiceEnabled]);
 
-  // Poll game status periodically (to detect game start/end)
+  // Poll game status periodically
   useEffect(() => {
     if (!ticket?.game_id) return;
     const interval = setInterval(async () => {
@@ -168,7 +167,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         body: JSON.stringify({
           accessToken: token,
           pattern,
-          ticketIndex: activeTab,
+          // Omitting ticketIndex allows the server to automatically check all tickets in the sheet!
         }),
       });
       const data = await res.json();
@@ -201,13 +200,8 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
 
   const sheet = ticket.ticket_data;
   const tickets: TambolaTicket[] = sheet.tickets;
-  const activeTicket = tickets[activeTab];
   const calledSet = new Set(calledNumbers);
   const lastCalled = calledNumbers.length > 0 ? calledNumbers[calledNumbers.length - 1] : null;
-
-  // Count how many numbers on this ticket have been called
-  const ticketNumbers = activeTicket.flat().filter((n): n is number => n !== null);
-  const calledOnTicket = ticketNumbers.filter((n) => calledSet.has(n)).length;
 
   return (
     <div className={styles.page}>
@@ -215,7 +209,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       <header className={styles.header}>
         <div className={styles.headerInfo}>
           <span className={styles.playerName}>{ticket.player_name}</span>
-          <span className={styles.gameMeta}>Game #{game.game_number}</span>
+          <span className={styles.gameMeta}>Game #{game.game_number} · {tickets.length} Tickets</span>
         </div>
         <div className={styles.headerRight}>
           <button
@@ -229,7 +223,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         </div>
       </header>
 
-      {/* Current Number */}
+      {/* Current Number Banner (Sticky at top under header) */}
       {game.status === 'LIVE' && lastCalled && (
         <div className={styles.currentBanner}>
           <span className={styles.currentLabel}>CALLED</span>
@@ -241,7 +235,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       {/* Waiting State */}
       {game.status === 'UPCOMING' && (
         <div className={styles.waitingBanner}>
-          <p>Your ticket is ready. Game will start soon.</p>
+          <p>Your tickets are ready. Game will start soon.</p>
         </div>
       )}
 
@@ -252,55 +246,52 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         </div>
       )}
 
-      {/* Ticket Tabs */}
-      {tickets.length > 1 && (
-        <div className={styles.tabs}>
-          {tickets.map((_, i) => (
-            <button
-              key={i}
-              className={`${styles.tab} ${i === activeTab ? styles.tabActive : ''}`}
-              onClick={() => setActiveTab(i)}
-            >
-              T{i + 1}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Vertical Scrollable Tickets List */}
+      <div className={styles.ticketsList}>
+        {tickets.map((t, tIndex) => {
+          const tNums = t.flat().filter((n): n is number => n !== null);
+          const calledOnT = tNums.filter((n) => calledSet.has(n)).length;
 
-      {/* Ticket Progress */}
-      <div className={styles.progress}>
-        <span>{calledOnTicket}/{ticketNumbers.length} called</span>
+          return (
+            <div key={tIndex} className={styles.ticketCard}>
+              <div className={styles.ticketHeader}>
+                <span className={styles.ticketTitle}>TICKET #{tIndex + 1}</span>
+                <span className={styles.ticketProgress}>
+                  {calledOnT}/{tNums.length} called
+                </span>
+              </div>
+              <div className={styles.ticketGrid}>
+                {t.map((row, ri) => (
+                  <div key={ri} className={styles.ticketRow}>
+                    {row.map((cell, ci) => {
+                      if (cell === null) {
+                        return <div key={ci} className={styles.ticketCellEmpty} />;
+                      }
+                      const isCalled = calledSet.has(cell);
+                      const isMarked = markedNumbers.has(cell);
+                      return (
+                        <button
+                          key={ci}
+                          className={`${styles.ticketCell} ${isCalled ? styles.ticketCellCalled : ''} ${isMarked ? styles.ticketCellMarked : ''}`}
+                          onClick={() => toggleMark(cell)}
+                          disabled={game.status !== 'LIVE'}
+                        >
+                          {cell}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Ticket Grid */}
-      <div className={styles.ticketGrid}>
-        {activeTicket.map((row, ri) => (
-          <div key={ri} className={styles.ticketRow}>
-            {row.map((cell, ci) => {
-              if (cell === null) {
-                return <div key={ci} className={styles.ticketCellEmpty} />;
-              }
-              const isCalled = calledSet.has(cell);
-              const isMarked = markedNumbers.has(cell);
-              return (
-                <button
-                  key={ci}
-                  className={`${styles.ticketCell} ${isCalled ? styles.ticketCellCalled : ''} ${isMarked ? styles.ticketCellMarked : ''}`}
-                  onClick={() => toggleMark(cell)}
-                  disabled={game.status !== 'LIVE'}
-                >
-                  {cell}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      {/* Claim Buttons */}
+      {/* Sticky Claim Buttons Bar at Bottom */}
       {game.status === 'LIVE' && (
         <div className={styles.claims}>
-          <span className="label">Claim a Pattern</span>
+          <span className={styles.claimsLabel}>CLAIM A PATTERN</span>
           <div className={styles.claimGrid}>
             {PATTERNS.map((p) => {
               const cs = claimStatus[p];
