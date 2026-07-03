@@ -1,0 +1,221 @@
+.ticketWrapper {
+  animation: fadeIn 0.4s ease;
+}
+
+.ticketHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+  padding: 0 var(--space-xs);
+}
+
+.ticketLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent-secondary);
+  text-transform: uppercase;
+}
+
+.markedCount {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ticket {
+  background: var(--bg-card);
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xs);
+  overflow: hidden;
+  box-shadow: var(--shadow-md), var(--shadow-glow-purple);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 3px;
+}
+
+.row + .row {
+  margin-top: 3px;
+}
+
+.cell {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--bg-glass-light);
+  cursor: default;
+  transition: all var(--transition-fast);
+  font-family: var(--font-mono);
+  font-size: clamp(0.75rem, 2.5vw, 1rem);
+  font-weight: 700;
+  color: var(--text-primary);
+  padding: 0;
+  min-width: 0;
+}
+
+.cell.empty {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  cursor: default;
+}
+
+.cell.called {
+  background: rgba(108, 92, 231, 0.15);
+  border: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
+  animation: numberCalled 0.4s ease;
+}
+
+.cell.callable {
+  cursor: pointer;
+  animation: pulse 1.5s ease infinite;
+}
+
+.cell.callable:hover {
+  background: rgba(108, 92, 231, 0.3);
+  transform: scale(1.08);
+  box-shadow: 0 0 12px var(--accent-primary-glow);
+}
+
+.cell.marked {
+  background: linear-gradient(135deg, var(--accent-primary), #8b5cf6);
+  color: white;
+  border: none;
+  box-shadow: 0 2px 10px var(--accent-primary-glow);
+  cursor: pointer;
+  animation: none;
+}
+
+.cell.marked:hover {
+  transform: scale(1.05);
+}
+
+.number {
+  position: relative;
+  z-index: 1;
+}
+
+.stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.4em;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.3);
+  animation: stampMark 0.3s var(--transition-spring);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+/* Small phones (320–374px) */
+@media (max-width: 374px) {
+  .cell {
+    font-size: 0.6rem;
+    border-radius: 3px;
+  }
+
+  .ticket {
+    padding: 2px;
+    border-radius: var(--radius-md);
+  }
+
+  .row {
+    gap: 1px;
+  }
+
+  .row + .row {
+    margin-top: 1px;
+  }
+
+  .stamp {
+    font-size: 1em;
+  }
+
+  .ticketLabel,
+  .markedCount {
+    font-size: 0.65rem;
+  }
+}
+
+/* Standard phones (375–480px) */
+@media (max-width: 480px) {
+  .cell {
+    font-size: 0.7rem;
+    /* Remove aspect-ratio on very small screens — use min-height instead for touch targets */
+    aspect-ratio: auto;
+    min-height: 32px;
+  }
+
+  .ticket {
+    padding: 2px;
+  }
+
+  .row {
+    gap: 2px;
+  }
+
+  .row + .row {
+    margin-top: 2px;
+  }
+
+  /* Ensure callable cells have enough tap area */
+  .cell.callable,
+  .cell.marked {
+    min-height: 32px;
+  }
+}
+
+/* Tablets (481–768px): bigger cells */
+@media (min-width: 481px) and (max-width: 768px) {
+  .cell {
+    font-size: 0.9rem;
+  }
+
+  .ticket {
+    padding: var(--space-sm);
+  }
+
+  .row {
+    gap: 4px;
+  }
+
+  .row + .row {
+    margin-top: 4px;
+  }
+}
+
+/* Landscape phones */
+@media (max-height: 500px) and (orientation: landscape) {
+  .cell {
+    aspect-ratio: auto;
+    min-height: 28px;
+    font-size: 0.65rem;
+  }
+
+  .ticket {
+    padding: 2px;
+  }
+
+  .row {
+    gap: 1px;
+  }
+
+  .row + .row {
+    margin-top: 1px;
+  }
+}

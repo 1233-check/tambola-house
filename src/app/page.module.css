@@ -1,0 +1,342 @@
+.main {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) var(--space-md);
+  overflow: hidden;
+}
+
+/* Background floating balls */
+.bgBalls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.bgBall {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  opacity: 0.25;
+  animation: float 6s ease-in-out infinite;
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+/* Hero */
+.hero {
+  text-align: center;
+  animation: slideUp 0.6s ease;
+}
+
+.logoWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.logoBall {
+  font-size: 3rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+.title {
+  font-size: clamp(2.5rem, 8vw, 3.5rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.subtitle {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  max-width: 360px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+.badges {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.featureBadge {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  background: var(--bg-glass-light);
+  border: 1px solid var(--border-subtle);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Action Card */
+.actionCard {
+  padding: var(--space-xl);
+  animation: fadeInScale 0.5s ease 0.2s both;
+}
+
+.homeActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Form */
+.formSection {
+  animation: fadeIn 0.3s ease;
+}
+
+.formTitle {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-bottom: var(--space-xs);
+}
+
+.formDesc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+}
+
+.inputGroup {
+  margin-bottom: var(--space-md);
+}
+
+.inputLabel {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.error {
+  color: var(--error);
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm);
+  background: rgba(225, 112, 85, 0.1);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(225, 112, 85, 0.2);
+}
+
+.formActions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+/* How to Play */
+.howToPlay {
+  animation: fadeIn 0.5s ease 0.4s both;
+}
+
+.sectionTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  margin-bottom: var(--space-lg);
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+}
+
+.step {
+  padding: var(--space-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  animation: slideUp 0.5s ease both;
+  transition: border-color var(--transition-fast);
+}
+
+.step:hover {
+  border-color: var(--border-medium);
+}
+
+.stepIcon {
+  font-size: 1.8rem;
+  display: block;
+  margin-bottom: var(--space-sm);
+}
+
+.stepTitle {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: var(--space-xs);
+}
+
+.stepDesc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* === Responsive === */
+
+/* Small phones (320–374px): iPhone SE, Galaxy S Mini */
+@media (max-width: 374px) {
+  .container {
+    gap: var(--space-lg);
+  }
+
+  .hero {
+    gap: var(--space-sm);
+  }
+
+  .logoBall {
+    font-size: 2rem;
+  }
+
+  .title {
+    font-size: 2rem;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+  }
+
+  .actionCard {
+    padding: var(--space-md);
+  }
+
+  .steps {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .step {
+    padding: var(--space-sm);
+  }
+
+  .stepIcon {
+    font-size: 1.4rem;
+  }
+
+  .badges {
+    gap: var(--space-xs);
+  }
+
+  .featureBadge {
+    font-size: 0.65rem;
+    padding: 3px 8px;
+  }
+
+  .formActions {
+    flex-direction: column;
+  }
+
+  .formActions .btn {
+    width: 100%;
+  }
+}
+
+/* Standard phones (375–480px) */
+@media (max-width: 480px) {
+  .main {
+    padding: var(--space-md) var(--space-sm);
+    align-items: flex-start;
+    padding-top: var(--space-xl);
+  }
+
+  .container {
+    gap: var(--space-xl);
+  }
+
+  .logoBall {
+    font-size: 2.5rem;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+  }
+
+  .steps {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+  }
+
+  .bgBall {
+    width: 36px;
+    height: 36px;
+    font-size: 0.65rem;
+    opacity: 0.15;
+  }
+}
+
+/* Landscape phones */
+@media (max-height: 500px) and (orientation: landscape) {
+  .main {
+    align-items: flex-start;
+    padding-top: var(--space-md);
+  }
+
+  .container {
+    max-width: 600px;
+    gap: var(--space-lg);
+  }
+
+  .hero {
+    margin-bottom: 0;
+  }
+
+  .logoBall {
+    font-size: 2rem;
+  }
+
+  .title {
+    font-size: 2rem;
+  }
+
+  .steps {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Tablets (481px – 768px) */
+@media (min-width: 481px) and (max-width: 768px) {
+  .container {
+    max-width: 520px;
+  }
+
+  .steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
