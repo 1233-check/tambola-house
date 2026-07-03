@@ -163,7 +163,15 @@
 .lobbySettings {
   margin-bottom: var(--space-md);
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.settingRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-items: center;
 }
 
 .settingLabel {
@@ -173,6 +181,53 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-secondary);
+}
+
+/* Sheet Type Toggle */
+.sheetTypeToggle {
+  display: flex;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.sheetTypeBtn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-glass-light);
+  border: 2px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sheetTypeBtn:hover {
+  border-color: var(--border-medium);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sheetTypeActive {
+  border-color: var(--accent-primary);
+  background: rgba(108, 92, 231, 0.12);
+  color: var(--text-primary);
+  box-shadow: 0 0 15px var(--accent-primary-glow);
+}
+
+.sheetTypeDesc {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.sheetTypeActive .sheetTypeDesc {
+  color: var(--accent-primary);
 }
 
 .speedSelect {
@@ -189,6 +244,86 @@
 
 .speedSelect:focus {
   border-color: var(--accent-primary);
+}
+
+/* Sheet Badge (top bar) */
+.sheetBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent-secondary);
+  background: rgba(0, 206, 201, 0.1);
+  border: 1px solid rgba(0, 206, 201, 0.2);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+/* Ticket Tabs */
+.ticketTabs {
+  margin-bottom: var(--space-sm);
+  animation: fadeIn 0.3s ease;
+}
+
+.ticketTabsLabel {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  margin-bottom: var(--space-sm);
+}
+
+.ticketTabRow {
+  display: flex;
+  gap: 4px;
+}
+
+.ticketTab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-card);
+  border: 2px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+  min-width: 0;
+}
+
+.ticketTab:hover {
+  border-color: var(--border-medium);
+}
+
+.ticketTabActive {
+  border-color: var(--accent-primary);
+  background: rgba(108, 92, 231, 0.1);
+  box-shadow: 0 0 10px var(--accent-primary-glow);
+}
+
+.ticketTabNumber {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.ticketTabProgress {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.ticketTabActive .ticketTabNumber {
+  color: var(--accent-primary);
+}
+
+.ticketTabActive .ticketTabProgress {
+  color: var(--accent-secondary);
 }
 
 /* Game Grid */

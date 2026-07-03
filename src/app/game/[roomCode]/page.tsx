@@ -7,14 +7,18 @@ import Ticket from '@/components/Ticket';
 import NumberBoard from '@/components/NumberBoard';
 import ClaimPanel from '@/components/ClaimPanel';
 import PlayerList from '@/components/PlayerList';
-import { generateTicket } from '@/lib/game/ticket-generator';
+import { generateSheet } from '@/lib/game/ticket-generator';
+import type { SheetType } from '@/lib/game/ticket-generator';
 import styles from './page.module.css';
 
 export default function GamePage() {
   const params = useParams();
   const router = useRouter();
   const roomCode = (params.roomCode as string)?.toUpperCase();
-  const { state, dispatch, startGame, callNumber, markNumber, submitClaim, leaveRoom, patternProgress } = useGame();
+  const {
+    state, dispatch, startGame, callNumber, markNumber,
+    setActiveTicket, submitClaim, leaveRoom, sheetProgress,
+  } = useGame();
   const [autoCallActive, setAutoCallActive] = useState(false);
   const autoCallRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -22,14 +26,13 @@ export default function GamePage() {
   // Initialize if arriving directly (demo mode)
   useEffect(() => {
     if (!state.roomCode && roomCode) {
-      // User navigated directly — set up as host in demo mode
       const playerId = `player_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       dispatch({ type: 'SET_PLAYER', playerId, playerName: 'Host' });
       dispatch({ type: 'SET_ROOM', roomCode, gameId: `demo_${roomCode}`, isHost: true });
-      const ticket = generateTicket();
-      dispatch({ type: 'SET_TICKET', ticket });
+      const sheet = generateSheet(state.settings.sheetType);
+      dispatch({ type: 'SET_SHEET', sheet });
     }
-  }, [roomCode, state.roomCode, dispatch]);
+  }, [roomCode, state.roomCode, dispatch, state.settings.sheetType]);
 
   // Auto-call logic
   useEffect(() => {
@@ -46,11 +49,8 @@ export default function GamePage() {
     };
   }, [autoCallActive, state.status, state.settings.callIntervalMs, callNumber]);
 
-  // Stop auto-call when game ends
   useEffect(() => {
-    if (state.status === 'COMPLETED') {
-      setAutoCallActive(false);
-    }
+    if (state.status === 'COMPLETED') setAutoCallActive(false);
   }, [state.status]);
 
   // Confetti on valid claim
@@ -63,17 +63,16 @@ export default function GamePage() {
   }, [state.events]);
 
   const handleStartGame = useCallback(async () => {
-    if (!state.ticket) {
-      const ticket = generateTicket();
-      dispatch({ type: 'SET_TICKET', ticket });
+    if (!state.sheet) {
+      const sheet = generateSheet(state.settings.sheetType);
+      dispatch({ type: 'SET_SHEET', sheet });
     }
     await startGame();
-  }, [startGame, state.ticket, dispatch]);
+  }, [startGame, state.sheet, state.settings.sheetType, dispatch]);
 
   const handleCallNumber = useCallback(async () => {
     const num = await callNumber();
     if (num === null) {
-      // All numbers called
       dispatch({ type: 'SET_STATUS', status: 'COMPLETED' });
     }
   }, [callNumber, dispatch]);
@@ -91,16 +90,24 @@ export default function GamePage() {
     setAutoCallActive(prev => !prev);
   }, []);
 
-  // Speed control
   const handleSpeedChange = useCallback((speed: number) => {
     dispatch({ type: 'SET_SETTINGS', settings: { callIntervalMs: speed } });
   }, [dispatch]);
 
+  const handleSheetTypeChange = useCallback((type: SheetType) => {
+    dispatch({ type: 'SET_SETTINGS', settings: { sheetType: type } });
+    // Regenerate sheet with new type
+    const sheet = generateSheet(type);
+    dispatch({ type: 'SET_SHEET', sheet });
+  }, [dispatch]);
+
   const allPatternsClaimed = state.settings.patterns.every(p => state.claimedPatterns[p]);
+  const ticketCount = state.sheet?.tickets.length ?? 0;
+  const activeTicket = state.sheet?.tickets[state.activeTicketIndex] ?? null;
 
   return (
     <div className={styles.gamePage}>
-      {/* Confetti overlay */}
+      {/* Confetti */}
       {showConfetti && (
         <div className={styles.confettiOverlay}>
           {Array.from({ length: 30 }).map((_, i) => (
@@ -132,6 +139,11 @@ export default function GamePage() {
           </div>
         </div>
         <div className={styles.topRight}>
+          {state.sheet && (
+            <span className={styles.sheetBadge}>
+              {state.sheet.type === 'full' ? '📄 Full Sheet' : '📋 Half Sheet'}
+            </span>
+          )}
           <span className={`badge ${state.status === 'IN_PROGRESS' ? 'badge-live' : 'badge-waiting'}`}>
             {state.status === 'LOBBY' && '⏳ Waiting'}
             {state.status === 'IN_PROGRESS' && '🔴 Live'}
@@ -167,19 +179,43 @@ export default function GamePage() {
 
               {state.isHost && (
                 <div className={styles.lobbySettings}>
-                  <label className={styles.settingLabel}>
-                    Call Speed:
-                    <select
-                      className={styles.speedSelect}
-                      value={state.settings.callIntervalMs}
-                      onChange={(e) => handleSpeedChange(Number(e.target.value))}
-                    >
-                      <option value={3000}>Fast (3s)</option>
-                      <option value={5000}>Normal (5s)</option>
-                      <option value={7000}>Slow (7s)</option>
-                      <option value={10000}>Very Slow (10s)</option>
-                    </select>
-                  </label>
+                  {/* Sheet Type Selector */}
+                  <div className={styles.settingRow}>
+                    <span className={styles.settingLabel}>Sheet Type:</span>
+                    <div className={styles.sheetTypeToggle}>
+                      <button
+                        className={`${styles.sheetTypeBtn} ${state.settings.sheetType === 'full' ? styles.sheetTypeActive : ''}`}
+                        onClick={() => handleSheetTypeChange('full')}
+                      >
+                        📄 Full Sheet
+                        <span className={styles.sheetTypeDesc}>6 tickets · All 90 numbers</span>
+                      </button>
+                      <button
+                        className={`${styles.sheetTypeBtn} ${state.settings.sheetType === 'half' ? styles.sheetTypeActive : ''}`}
+                        onClick={() => handleSheetTypeChange('half')}
+                      >
+                        📋 Half Sheet
+                        <span className={styles.sheetTypeDesc}>3 tickets · 45 numbers</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Call Speed */}
+                  <div className={styles.settingRow}>
+                    <label className={styles.settingLabel}>
+                      Call Speed:
+                      <select
+                        className={styles.speedSelect}
+                        value={state.settings.callIntervalMs}
+                        onChange={(e) => handleSpeedChange(Number(e.target.value))}
+                      >
+                        <option value={3000}>Fast (3s)</option>
+                        <option value={5000}>Normal (5s)</option>
+                        <option value={7000}>Slow (7s)</option>
+                        <option value={10000}>Very Slow (10s)</option>
+                      </select>
+                    </label>
+                  </div>
                 </div>
               )}
 
@@ -206,21 +242,52 @@ export default function GamePage() {
         {/* Game In Progress / Completed */}
         {(state.status === 'IN_PROGRESS' || state.status === 'COMPLETED') && (
           <div className={styles.gameGrid}>
-            {/* Left Column: Ticket + Claims */}
+            {/* Left Column: Sheet Tickets + Claims */}
             <div className={styles.leftCol}>
-              {state.ticket && (
+              {/* Ticket Tab Navigation */}
+              {ticketCount > 1 && (
+                <div className={styles.ticketTabs}>
+                  <span className={styles.ticketTabsLabel}>
+                    {state.sheet?.type === 'full' ? 'FULL SHEET' : 'HALF SHEET'} — {ticketCount} TICKETS
+                  </span>
+                  <div className={styles.ticketTabRow}>
+                    {Array.from({ length: ticketCount }).map((_, i) => {
+                      // Count how many numbers on this ticket are called
+                      const ticket = state.sheet!.tickets[i];
+                      const ticketNums = ticket.flat().filter((n): n is number => n !== null);
+                      const calledSet = new Set(state.calledNumbers);
+                      const markedOnTicket = ticketNums.filter(n => calledSet.has(n)).length;
+
+                      return (
+                        <button
+                          key={i}
+                          className={`${styles.ticketTab} ${state.activeTicketIndex === i ? styles.ticketTabActive : ''}`}
+                          onClick={() => setActiveTicket(i)}
+                        >
+                          <span className={styles.ticketTabNumber}>T{i + 1}</span>
+                          <span className={styles.ticketTabProgress}>{markedOnTicket}/15</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Active Ticket */}
+              {activeTicket && (
                 <Ticket
-                  ticket={state.ticket}
+                  ticket={activeTicket}
                   markedNumbers={state.markedNumbers}
                   calledNumbers={state.calledNumbers}
                   onMarkNumber={markNumber}
                   disabled={state.status === 'COMPLETED'}
+                  ticketLabel={ticketCount > 1 ? `TICKET ${state.activeTicketIndex + 1} OF ${ticketCount}` : undefined}
                 />
               )}
 
               <ClaimPanel
                 patterns={state.settings.patterns}
-                progress={patternProgress}
+                progress={sheetProgress}
                 claimedPatterns={state.claimedPatterns}
                 events={state.events}
                 onClaim={submitClaim}
@@ -231,7 +298,6 @@ export default function GamePage() {
 
             {/* Right Column: Number Board + Host Controls */}
             <div className={styles.rightCol}>
-              {/* Host Controls */}
               {state.isHost && state.status === 'IN_PROGRESS' && (
                 <div className={styles.hostControls}>
                   <span className={styles.hostLabel}>HOST CONTROLS</span>
@@ -260,7 +326,6 @@ export default function GamePage() {
                 </div>
               )}
 
-              {/* Game Completed Banner */}
               {(state.status === 'COMPLETED' || allPatternsClaimed) && (
                 <div className={styles.completedBanner}>
                   <h2>🎉 Game Over!</h2>

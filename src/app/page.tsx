@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGame } from '@/lib/game/game-context';
+import type { SheetType } from '@/lib/game/ticket-generator';
 import styles from './page.module.css';
 
 export default function HomePage() {
@@ -11,6 +12,7 @@ export default function HomePage() {
   const [mode, setMode] = useState<'home' | 'create' | 'join'>('home');
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
+  const [sheetType, setSheetType] = useState<SheetType>('full');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +24,7 @@ export default function HomePage() {
     setLoading(true);
     setError(null);
     try {
-      const code = await createRoom(playerName.trim());
+      const code = await createRoom(playerName.trim(), sheetType);
       router.push(`/game/${code}`);
     } catch (err) {
       setError((err as Error).message);
@@ -83,6 +85,7 @@ export default function HomePage() {
           <div className={styles.badges}>
             <span className={styles.featureBadge}>🎯 Free to Play</span>
             <span className={styles.featureBadge}>👥 Up to 25 Players</span>
+            <span className={styles.featureBadge}>📄 Full & Half Sheets</span>
             <span className={styles.featureBadge}>⚡ Real-time</span>
           </div>
         </div>
@@ -126,6 +129,29 @@ export default function HomePage() {
                   autoFocus
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                 />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.inputLabel}>Sheet Type</label>
+                <div className={styles.sheetTypeSelector}>
+                  <button
+                    className={`${styles.sheetOption} ${sheetType === 'full' ? styles.sheetOptionActive : ''}`}
+                    onClick={() => setSheetType('full')}
+                    type="button"
+                  >
+                    <span className={styles.sheetOptionIcon}>📄</span>
+                    <span className={styles.sheetOptionTitle}>Full Sheet</span>
+                    <span className={styles.sheetOptionDesc}>6 tickets · All 90 numbers</span>
+                  </button>
+                  <button
+                    className={`${styles.sheetOption} ${sheetType === 'half' ? styles.sheetOptionActive : ''}`}
+                    onClick={() => setSheetType('half')}
+                    type="button"
+                  >
+                    <span className={styles.sheetOptionIcon}>📋</span>
+                    <span className={styles.sheetOptionTitle}>Half Sheet</span>
+                    <span className={styles.sheetOptionDesc}>3 tickets · 45 numbers</span>
+                  </button>
+                </div>
               </div>
               {error && <p className={styles.error}>{error}</p>}
               <div className={styles.formActions}>

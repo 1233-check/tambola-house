@@ -10,9 +10,10 @@ interface TicketProps {
   calledNumbers: number[];
   onMarkNumber: (num: number) => void;
   disabled?: boolean;
+  ticketLabel?: string; // e.g. "TICKET 1 OF 6"
 }
 
-export default function Ticket({ ticket, markedNumbers, calledNumbers, onMarkNumber, disabled }: TicketProps) {
+export default function Ticket({ ticket, markedNumbers, calledNumbers, onMarkNumber, disabled, ticketLabel }: TicketProps) {
   const calledSet = new Set(calledNumbers);
 
   const handleCellClick = useCallback(
@@ -27,9 +28,9 @@ export default function Ticket({ ticket, markedNumbers, calledNumbers, onMarkNum
   return (
     <div className={styles.ticketWrapper}>
       <div className={styles.ticketHeader}>
-        <span className={styles.ticketLabel}>YOUR TICKET</span>
+        <span className={styles.ticketLabel}>{ticketLabel || 'YOUR TICKET'}</span>
         <span className={styles.markedCount}>
-          {markedNumbers.size} / 15
+          {ticket.flat().filter((n): n is number => n !== null && calledSet.has(n) && markedNumbers.has(n)).length} / 15
         </span>
       </div>
       <div className={styles.ticket}>

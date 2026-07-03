@@ -2,7 +2,7 @@
  * Game types shared across frontend and backend.
  */
 
-import type { TambolaTicket } from './ticket-generator';
+import type { TambolaTicket, TambolaSheet, SheetType } from './ticket-generator';
 import type { PatternName } from './claim-validator';
 
 export type GameStatus = 'LOBBY' | 'IN_PROGRESS' | 'COMPLETED';
@@ -11,6 +11,7 @@ export interface GameSettings {
   autoCall: boolean;
   callIntervalMs: number; // 3000 – 10000
   patterns: PatternName[];
+  sheetType: SheetType; // 'full' (6 tickets) or 'half' (3 tickets)
 }
 
 export interface Player {
@@ -21,8 +22,8 @@ export interface Player {
   isOnline: boolean;
 }
 
-export interface PlayerTicket {
-  ticket: TambolaTicket;
+export interface PlayerSheet {
+  sheet: TambolaSheet;
   markedNumbers: number[];
 }
 
@@ -30,6 +31,7 @@ export interface ClaimEvent {
   playerId: string;
   playerName: string;
   patternName: PatternName;
+  ticketIndex: number; // which ticket in the sheet the claim is for
   isValid: boolean;
   timestamp: string;
 }
@@ -51,4 +53,5 @@ export const DEFAULT_SETTINGS: GameSettings = {
   autoCall: false,
   callIntervalMs: 5000,
   patterns: ['Early Five', 'Top Line', 'Middle Line', 'Bottom Line', 'Four Corners', 'Full House'],
+  sheetType: 'full',
 };

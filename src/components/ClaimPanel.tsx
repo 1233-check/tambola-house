@@ -9,6 +9,7 @@ interface PatternProgress {
   matched: number;
   total: number;
   complete: boolean;
+  ticketIndex?: number; // which ticket in the sheet has the best progress
 }
 
 interface ClaimPanelProps {
@@ -16,7 +17,7 @@ interface ClaimPanelProps {
   progress: Record<PatternName, PatternProgress> | null;
   claimedPatterns: Record<string, { winnerId: string; winnerName: string }>;
   events: ClaimEvent[];
-  onClaim: (pattern: PatternName) => Promise<{ valid: boolean; pattern: string; message: string } | null>;
+  onClaim: (pattern: PatternName, ticketIndex?: number) => Promise<{ valid: boolean; pattern: string; ticketIndex: number; message: string } | null>;
   disabled?: boolean;
   playerId: string | null;
 }

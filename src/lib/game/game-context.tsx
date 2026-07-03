@@ -3,9 +3,9 @@
 import React, { createContext, useContext, useReducer, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { GameState, GameStatus, Player, ClaimEvent } from '@/lib/game/types';
-import type { TambolaTicket } from '@/lib/game/ticket-generator';
+import type { TambolaSheet, SheetType } from '@/lib/game/ticket-generator';
 import type { PatternName } from '@/lib/game/claim-validator';
-import { getPatternProgress } from '@/lib/game/claim-validator';
+import { getSheetPatternProgress, validateSheetClaim } from '@/lib/game/claim-validator';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 /* ---- State ---- */
@@ -22,7 +22,8 @@ interface AppState {
   /* Game */
   status: GameStatus;
   players: Player[];
-  ticket: TambolaTicket | null;
+  sheet: TambolaSheet | null;
+  activeTicketIndex: number; // which ticket in the sheet the player is viewing
   calledNumbers: number[];
   currentNumber: number | null;
   markedNumbers: Set<number>;
@@ -45,7 +46,8 @@ const initialState: AppState = {
   isHost: false,
   status: 'LOBBY',
   players: [],
-  ticket: null,
+  sheet: null,
+  activeTicketIndex: 0,
   calledNumbers: [],
   currentNumber: null,
   markedNumbers: new Set(),
@@ -53,6 +55,7 @@ const initialState: AppState = {
   settings: {
     autoCall: false,
     callIntervalMs: 5000,
+    sheetType: 'full',
     patterns: ['Early Five', 'Top Line', 'Middle Line', 'Bottom Line', 'Four Corners', 'Full House'],
   },
   events: [],
@@ -68,7 +71,8 @@ type Action =
   | { type: 'SET_PLAYERS'; players: Player[] }
   | { type: 'PLAYER_JOINED'; player: Player }
   | { type: 'PLAYER_LEFT'; playerId: string }
-  | { type: 'SET_TICKET'; ticket: TambolaTicket }
+  | { type: 'SET_SHEET'; sheet: TambolaSheet }
+  | { type: 'SET_ACTIVE_TICKET'; index: number }
   | { type: 'NUMBER_CALLED'; number: number }
   | { type: 'MARK_NUMBER'; number: number }
   | { type: 'UNMARK_NUMBER'; number: number }
@@ -77,7 +81,6 @@ type Action =
   | { type: 'SET_LOADING'; loading: boolean }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'RESET' }
-  | { type: 'GAME_STARTED'; calledNumbers: number[] }
   | { type: 'SYNC_STATE'; calledNumbers: number[]; claimedPatterns: Record<string, { winnerId: string; winnerName: string }>; status: GameStatus };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -95,8 +98,10 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, players: [...state.players, action.player] };
     case 'PLAYER_LEFT':
       return { ...state, players: state.players.filter(p => p.id !== action.playerId) };
-    case 'SET_TICKET':
-      return { ...state, ticket: action.ticket };
+    case 'SET_SHEET':
+      return { ...state, sheet: action.sheet, activeTicketIndex: 0 };
+    case 'SET_ACTIVE_TICKET':
+      return { ...state, activeTicketIndex: action.index };
     case 'NUMBER_CALLED':
       if (state.calledNumbers.includes(action.number)) return state;
       return {
@@ -131,8 +136,6 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, loading: action.loading };
     case 'SET_ERROR':
       return { ...state, error: action.error };
-    case 'GAME_STARTED':
-      return { ...state, status: 'IN_PROGRESS', calledNumbers: action.calledNumbers || [] };
     case 'SYNC_STATE':
       return {
         ...state,
@@ -154,21 +157,23 @@ interface GameContextValue {
   dispatch: React.Dispatch<Action>;
 
   /* Actions */
-  createRoom: (playerName: string) => Promise<string>;
+  createRoom: (playerName: string, sheetType?: SheetType) => Promise<string>;
   joinRoom: (roomCode: string, playerName: string) => Promise<void>;
   startGame: () => Promise<void>;
   callNumber: () => Promise<number | null>;
   markNumber: (num: number) => void;
-  submitClaim: (pattern: PatternName) => Promise<ClaimResult | null>;
+  setActiveTicket: (index: number) => void;
+  submitClaim: (pattern: PatternName, ticketIndex?: number) => Promise<ClaimResultValue | null>;
   leaveRoom: () => void;
 
   /* Helpers */
-  patternProgress: ReturnType<typeof getPatternProgress> | null;
+  sheetProgress: ReturnType<typeof getSheetPatternProgress> | null;
 }
 
-interface ClaimResult {
+interface ClaimResultValue {
   valid: boolean;
   pattern: string;
+  ticketIndex: number;
   message: string;
 }
 
@@ -269,23 +274,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, [state.playerId, state.playerName, state.isHost]);
 
   /* --- Create Room --- */
-  const createRoom = useCallback(async (playerName: string): Promise<string> => {
+  const createRoom = useCallback(async (playerName: string, sheetType: SheetType = 'full'): Promise<string> => {
     dispatch({ type: 'SET_LOADING', loading: true });
     dispatch({ type: 'SET_ERROR', error: null });
 
     try {
-      // Generate player ID (anonymous)
       const playerId = `player_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       dispatch({ type: 'SET_PLAYER', playerId, playerName });
 
-      // Generate room code
       const roomCode = Math.random().toString(36).slice(2, 8).toUpperCase();
       const gameId = `game_${Date.now()}`;
 
+      dispatch({ type: 'SET_SETTINGS', settings: { sheetType } });
       dispatch({ type: 'SET_ROOM', roomCode, gameId, isHost: true });
 
-      // For MVP: store game state via Supabase
-      // If Supabase is not configured, we still run the frontend in demo mode
       try {
         await supabase.from('games').insert({
           id: gameId,
@@ -297,7 +299,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           max_players: 25,
         });
       } catch {
-        // Supabase not configured — continue in local/demo mode
         console.warn('Supabase not configured, running in demo mode');
       }
 
@@ -322,12 +323,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const gameId = `game_joined_${roomCode}`;
       dispatch({ type: 'SET_ROOM', roomCode, gameId, isHost: false });
 
-      // Generate ticket for this player
-      const { generateTicket } = await import('@/lib/game/ticket-generator');
-      const ticket = generateTicket();
-      dispatch({ type: 'SET_TICKET', ticket });
+      // Generate sheet for this player
+      const { generateSheet } = await import('@/lib/game/ticket-generator');
+      const sheet = generateSheet(state.settings.sheetType);
+      dispatch({ type: 'SET_SHEET', sheet });
 
-      // Subscribe to room channel
       subscribeToRoom(roomCode);
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: (err as Error).message });
@@ -335,7 +335,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     } finally {
       dispatch({ type: 'SET_LOADING', loading: false });
     }
-  }, [subscribeToRoom]);
+  }, [subscribeToRoom, state.settings.sheetType]);
 
   /* --- Start Game --- */
   const startGame = useCallback(async (): Promise<void> => {
@@ -343,14 +343,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     dispatch({ type: 'SET_STATUS', status: 'IN_PROGRESS' });
 
-    // Generate ticket for host too
-    if (!state.ticket) {
-      const { generateTicket } = await import('@/lib/game/ticket-generator');
-      const ticket = generateTicket();
-      dispatch({ type: 'SET_TICKET', ticket });
+    // Generate sheet for host too
+    if (!state.sheet) {
+      const { generateSheet } = await import('@/lib/game/ticket-generator');
+      const sheet = generateSheet(state.settings.sheetType);
+      dispatch({ type: 'SET_SHEET', sheet });
     }
 
-    // Broadcast game started
     if (channelRef.current) {
       channelRef.current.send({
         type: 'broadcast',
@@ -358,13 +357,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         payload: {},
       });
     }
-  }, [state.isHost, state.roomCode, state.ticket]);
+  }, [state.isHost, state.roomCode, state.sheet, state.settings.sheetType]);
 
   /* --- Call Number --- */
   const callNumber = useCallback(async (): Promise<number | null> => {
     if (!state.isHost) return null;
 
-    // Find next uncalled number
     const allNumbers = shuffleRange(1, 90);
     const calledSet = new Set(state.calledNumbers);
     const nextNumber = allNumbers.find(n => !calledSet.has(n));
@@ -376,7 +374,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     dispatch({ type: 'NUMBER_CALLED', number: nextNumber });
 
-    // Broadcast to all players
     if (channelRef.current) {
       channelRef.current.send({
         type: 'broadcast',
@@ -397,24 +394,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.markedNumbers]);
 
-  /* --- Submit Claim --- */
-  const submitClaim = useCallback(async (pattern: PatternName): Promise<ClaimResult | null> => {
-    if (!state.ticket || !state.playerId) return null;
+  /* --- Set Active Ticket --- */
+  const setActiveTicket = useCallback((index: number) => {
+    dispatch({ type: 'SET_ACTIVE_TICKET', index });
+  }, []);
 
-    const { validateClaim } = await import('@/lib/game/claim-validator');
-    const result = validateClaim(state.ticket, state.calledNumbers, pattern);
+  /* --- Submit Claim --- */
+  const submitClaim = useCallback(async (pattern: PatternName, ticketIndex?: number): Promise<ClaimResultValue | null> => {
+    if (!state.sheet || !state.playerId) return null;
+
+    const result = validateSheetClaim(state.sheet, state.calledNumbers, pattern, ticketIndex);
 
     const event: ClaimEvent = {
       playerId: state.playerId,
       playerName: state.playerName,
       patternName: pattern,
+      ticketIndex: result.ticketIndex,
       isValid: result.valid,
       timestamp: new Date().toISOString(),
     };
 
     dispatch({ type: 'CLAIM_RESULT', event });
 
-    // Broadcast claim result
     if (channelRef.current) {
       channelRef.current.send({
         type: 'broadcast',
@@ -424,7 +425,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
 
     return result;
-  }, [state.ticket, state.calledNumbers, state.playerId, state.playerName]);
+  }, [state.sheet, state.calledNumbers, state.playerId, state.playerName]);
 
   /* --- Leave Room --- */
   const leaveRoom = useCallback(() => {
@@ -444,9 +445,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'RESET' });
   }, [state.playerId]);
 
-  /* Pattern progress */
-  const patternProgress = state.ticket
-    ? getPatternProgress(state.ticket, state.calledNumbers)
+  /* Sheet pattern progress */
+  const sheetProgress = state.sheet
+    ? getSheetPatternProgress(state.sheet, state.calledNumbers)
     : null;
 
   const value: GameContextValue = {
@@ -457,9 +458,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     startGame,
     callNumber,
     markNumber,
+    setActiveTicket,
     submitClaim,
     leaveRoom,
-    patternProgress,
+    sheetProgress,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
@@ -471,7 +473,7 @@ export function useGame() {
   return ctx;
 }
 
-/* Utility: generate a shuffled range of numbers */
+/* Utility */
 function shuffleRange(min: number, max: number): number[] {
   const arr: number[] = [];
   for (let i = min; i <= max; i++) arr.push(i);
