@@ -13,6 +13,7 @@ interface TicketData {
   sheet_type: string;
   access_token: string;
   ticket_data: TambolaSheet;
+  selected_tickets: number[] | null;
 }
 
 interface ClaimData {
@@ -62,6 +63,12 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
   }, [gameId, router]);
 
   useEffect(() => { fetchGame(); }, [fetchGame]);
+
+  // Auto-refresh every 5s to see updated player selections
+  useEffect(() => {
+    const interval = setInterval(fetchGame, 5000);
+    return () => clearInterval(interval);
+  }, [fetchGame]);
 
   // Auto-call interval
   useEffect(() => {
@@ -132,9 +139,8 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
       });
       const data = await res.json();
       if (res.ok) {
-        // Copy link to clipboard
         await navigator.clipboard.writeText(data.playerLink);
-        showToast(`Ticket created! Link copied to clipboard.`);
+        showToast(`Ticket link created & copied to clipboard!`);
         setNewPlayerName('');
         setNewPlayerPhone('');
         setShowAddPlayer(false);
@@ -157,7 +163,7 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
   const copyWhatsAppLink = (ticket: TicketData) => {
     const baseUrl = window.location.origin;
     const link = `${baseUrl}/play/${ticket.access_token}`;
-    const text = `🎟️ Tambola House - Game #${game?.game_number}\n\nHi ${ticket.player_name}! Your ticket is ready.\n\nOpen this link:\n${link}`;
+    const text = `🎟️ Tambola House - Game #${game?.game_number}\n\nHi ${ticket.player_name}!\n\nOpen this link to choose your lucky tickets:\n${link}`;
     const waUrl = `https://wa.me/${ticket.player_phone}?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
   };
@@ -174,6 +180,14 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
   const lastCalled = game.called_numbers?.length > 0
     ? game.called_numbers[game.called_numbers.length - 1]
     : null;
+
+  // Count how many of the 66 pool tickets are booked
+  const allBookedTickets = new Set<number>();
+  game.tickets?.forEach((t) => {
+    if (Array.isArray(t.selected_tickets)) {
+      t.selected_tickets.forEach((n) => allBookedTickets.add(n));
+    }
+  });
 
   return (
     <div className={styles.page}>
@@ -250,6 +264,24 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
           </div>
         </section>
 
+        {/* Ticket Pool Summary */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>
+            Ticket Pool — {allBookedTickets.size}/66 Booked
+          </h2>
+          <div className={styles.poolGrid}>
+            {Array.from({ length: 66 }, (_, i) => i + 1).map((n) => (
+              <div
+                key={n}
+                className={`${styles.poolCell} ${allBookedTickets.has(n) ? styles.poolBooked : ''}`}
+                title={allBookedTickets.has(n) ? `Ticket #${n} — SOLD` : `Ticket #${n} — Available`}
+              >
+                {n}
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Players / Tickets */}
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
@@ -301,7 +333,7 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
                   </button>
                 </div>
                 <button className="btn btn-primary" type="submit" disabled={addingPlayer}>
-                  {addingPlayer ? <span className="spinner" /> : 'Generate Ticket'}
+                  {addingPlayer ? <span className="spinner" /> : 'Generate Link'}
                 </button>
               </div>
             </form>
@@ -309,37 +341,49 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
 
           <div className={styles.playerList}>
             {game.tickets?.length === 0 && (
-              <p className={styles.emptyText}>No players yet. Add players to generate tickets.</p>
+              <p className={styles.emptyText}>No players yet. Add players to generate ticket links.</p>
             )}
-            {game.tickets?.map((ticket) => (
-              <div key={ticket.id} className={styles.playerRow}>
-                <div className={styles.playerInfo}>
-                  <span className={styles.playerName}>{ticket.player_name}</span>
-                  <span className={styles.playerMeta}>
-                    {ticket.sheet_type === 'full' ? '6 tickets' : '3 tickets'}
-                    {ticket.player_phone && ` · ${ticket.player_phone}`}
-                  </span>
-                </div>
-                <div className={styles.playerActions}>
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => copyPlayerLink(ticket.access_token)}
-                    title="Copy link"
-                  >
-                    Copy Link
-                  </button>
-                  {ticket.player_phone && (
+            {game.tickets?.map((ticket) => {
+              const hasSelected = Array.isArray(ticket.selected_tickets) && ticket.selected_tickets.length > 0;
+              return (
+                <div key={ticket.id} className={styles.playerRow}>
+                  <div className={styles.playerInfo}>
+                    <span className={styles.playerName}>{ticket.player_name}</span>
+                    <span className={styles.playerMeta}>
+                      {ticket.sheet_type === 'full' ? 'Full Sheet' : 'Half Sheet'}
+                      {ticket.player_phone && ` · ${ticket.player_phone}`}
+                    </span>
+                    {hasSelected ? (
+                      <span className={styles.playerTickets}>
+                        Tickets: #{ticket.selected_tickets!.join(', #')}
+                      </span>
+                    ) : (
+                      <span className={styles.playerPending}>
+                        ⏳ Awaiting ticket selection
+                      </span>
+                    )}
+                  </div>
+                  <div className={styles.playerActions}>
                     <button
                       className="btn btn-sm"
-                      onClick={() => copyWhatsAppLink(ticket)}
-                      title="Send via WhatsApp"
+                      onClick={() => copyPlayerLink(ticket.access_token)}
+                      title="Copy link"
                     >
-                      WhatsApp
+                      Copy Link
                     </button>
-                  )}
+                    {ticket.player_phone && (
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => copyWhatsAppLink(ticket)}
+                        title="Send via WhatsApp"
+                      >
+                        WhatsApp
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 

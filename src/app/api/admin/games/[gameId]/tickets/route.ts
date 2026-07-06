@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { createServerClient } from '@/lib/supabase';
 import { generateSheet } from '@/lib/game/ticket-generator';
-import type { SheetType } from '@/lib/game/ticket-generator';
+import type { SheetType, TambolaSheet } from '@/lib/game/ticket-generator';
 
 interface RouteParams {
   params: Promise<{ gameId: string }>;
 }
 
-/** POST /api/admin/games/[gameId]/tickets — Generate a ticket for a player */
+/** POST /api/admin/games/[gameId]/tickets — Generate a ticket link for a player */
 export async function POST(req: NextRequest, { params }: RouteParams) {
   const isAdmin = await isAdminAuthenticated();
   if (!isAdmin) {
@@ -28,10 +28,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
   const sb = createServerClient();
 
-  // Verify game exists and is UPCOMING
+  // Verify game exists
   const { data: game, error: gameError } = await sb
     .from('games')
-    .select('id, status')
+    .select('id, game_number, status')
     .eq('id', gameId)
     .single();
 
@@ -49,8 +49,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Maximum 25 players per game' }, { status: 400 });
   }
 
-  // Generate ticket server-side (anti-cheat: player never generates their own ticket)
-  const sheet = generateSheet(sheetType as SheetType);
+  // Generate a temporary placeholder sheet. The actual ticket_data will be
+  // replaced when the player selects their ticket numbers via /api/tickets/select.
+  // This ensures ticket_data is never null in the database.
+  const placeholderSheet: TambolaSheet = generateSheet(sheetType as SheetType);
 
   const { data: ticket, error } = await sb
     .from('tickets')
@@ -59,7 +61,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       player_name: playerName,
       player_phone: playerPhone || '',
       sheet_type: sheetType,
-      ticket_data: sheet,
+      ticket_data: placeholderSheet,
+      // selected_tickets left as null — player will choose from 1-66 pool
     })
     .select()
     .single();
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     ticket,
     playerLink,
     whatsappLink: `https://wa.me/${playerPhone}?text=${encodeURIComponent(
-      `🎟️ Tambola House - Game #${game.id}\n\nHi ${playerName}! Your ticket is ready.\n\nOpen this link to view your ticket:\n${playerLink}\n\nGood luck! 🍀`
+      `🎟️ Tambola House - Game #${game.game_number}\n\nHi ${playerName}!\n\nOpen this link to choose your lucky tickets:\n${playerLink}\n\nGood luck! 🍀`
     )}`,
   });
 }

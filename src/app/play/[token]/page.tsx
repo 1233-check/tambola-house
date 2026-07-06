@@ -12,8 +12,7 @@ interface TicketInfo {
   player_name: string;
   sheet_type: string;
   ticket_data: TambolaSheet;
-  ticket_number: number | null;
-  selected_tickets?: number[];
+  selected_tickets: number[] | null;
   access_token: string;
 }
 
@@ -295,7 +294,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
                 setSelectedNums(ticket.selected_tickets || []);
                 setShowSelector(true);
               }}
-              title="Select different ticket numbers"
+              title="Change ticket selection"
             >
               🎟️ Change #
             </button>

@@ -241,9 +241,48 @@
   color: var(--text-muted);
 }
 
+.playerTickets {
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--success);
+}
+
+.playerPending {
+  font-size: 0.7rem;
+  color: var(--warning);
+}
+
 .playerActions {
   display: flex;
   gap: var(--space-xs);
+}
+
+/* Ticket Pool Grid */
+.poolGrid {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 3px;
+}
+
+.poolCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+}
+
+.poolBooked {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: var(--text-primary);
 }
 
 /* Claims */
@@ -318,6 +357,10 @@
     font-size: 0.7rem;
   }
 
+  .poolGrid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
   .formRow {
     flex-direction: column;
   }
@@ -336,3 +379,4 @@
     flex: 1;
   }
 }
+
