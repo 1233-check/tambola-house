@@ -13,6 +13,7 @@ interface TicketInfo {
   sheet_type: string;
   ticket_data: TambolaSheet;
   ticket_number: number | null;
+  selected_tickets?: number[];
   access_token: string;
 }
 
@@ -45,13 +46,13 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
   const [toast, setToast] = useState('');
   const prevNumberRef = useRef<number | null>(null);
 
-  // Ticket Selection State
+  // Ticket Selection State (1 to 66 pool)
   const [showSelector, setShowSelector] = useState(false);
   const [takenNumbers, setTakenNumbers] = useState<number[]>([]);
-  const [selectedNum, setSelectedNum] = useState<number | null>(null);
+  const [selectedNums, setSelectedNums] = useState<number[]>([]);
   const [selecting, setSelecting] = useState(false);
 
-  // Fetch ticket + game data + taken booklet numbers
+  // Fetch ticket + game data + sold ticket numbers
   const fetchData = useCallback(async () => {
     try {
       const { data: ticketData, error: ticketError } = await supabase
@@ -66,11 +67,12 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       }
       setTicket(ticketData);
 
-      // If ticket_number is not yet chosen, show selection screen by default
-      if (ticketData.ticket_number === null || ticketData.ticket_number === undefined) {
+      // Check if player has selected tickets yet
+      const hasSelected = Array.isArray(ticketData.selected_tickets) && ticketData.selected_tickets.length > 0;
+      if (!hasSelected) {
         setShowSelector(true);
       } else {
-        setSelectedNum(ticketData.ticket_number);
+        setSelectedNums(ticketData.selected_tickets || []);
       }
 
       const { data: gameData, error: gameError } = await supabase
@@ -86,17 +88,20 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       setGame(gameData);
       setCalledNumbers(gameData.called_numbers || []);
 
-      // Fetch taken booklet numbers for this game
+      // Fetch all sold/taken ticket numbers (1-66) in this game by other players
       const { data: allTickets } = await supabase
         .from('tickets')
-        .select('id, ticket_number')
+        .select('id, selected_tickets')
         .eq('game_id', ticketData.game_id)
-        .not('ticket_number', 'is', null);
+        .not('selected_tickets', 'is', null);
 
-      const taken = allTickets
-        ?.filter((t) => t.id !== ticketData.id && typeof t.ticket_number === 'number')
-        .map((t) => t.ticket_number!) || [];
-      setTakenNumbers(taken);
+      const takenSet = new Set<number>();
+      allTickets?.forEach((t) => {
+        if (t.id !== ticketData.id && Array.isArray(t.selected_tickets)) {
+          t.selected_tickets.forEach((n: number) => takenSet.add(n));
+        }
+      });
+      setTakenNumbers(Array.from(takenSet));
     } catch {
       setError('Failed to load. Please try again.');
     } finally {
@@ -180,8 +185,24 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
     });
   };
 
-  const handleSelectBooklet = async () => {
-    if (selectedNum === null || selecting) return;
+  const requiredCount = ticket?.sheet_type === 'half' ? 3 : 6;
+
+  const toggleSelectNum = (n: number) => {
+    if (takenNumbers.includes(n)) return;
+    setSelectedNums((prev) => {
+      if (prev.includes(n)) {
+        return prev.filter((item) => item !== n);
+      }
+      if (prev.length >= requiredCount) {
+        showToast(`You can only select exactly ${requiredCount} tickets!`);
+        return prev;
+      }
+      return [...prev, n].sort((a, b) => a - b);
+    });
+  };
+
+  const handleLockTickets = async () => {
+    if (selectedNums.length !== requiredCount || selecting) return;
     setSelecting(true);
     try {
       const res = await fetch('/api/tickets/select', {
@@ -189,7 +210,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accessToken: token,
-          ticketNumber: selectedNum,
+          selectedTickets: selectedNums,
         }),
       });
       const data = await res.json();
@@ -198,10 +219,12 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         setShowSelector(false);
         showToast(data.message);
       } else {
-        showToast(data.error || 'Failed to lock ticket number');
+        showToast(data.error || 'Failed to lock tickets');
+        // Refresh taken numbers if conflict occurred
+        fetchData();
       }
     } catch {
-      showToast('Network error while selecting ticket');
+      showToast('Network error while locking tickets');
     } finally {
       setSelecting(false);
     }
@@ -252,6 +275,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
   const tickets: TambolaTicket[] = sheet.tickets;
   const calledSet = new Set(calledNumbers);
   const lastCalled = calledNumbers.length > 0 ? calledNumbers[calledNumbers.length - 1] : null;
+  const hasSelected = Array.isArray(ticket.selected_tickets) && ticket.selected_tickets.length > 0;
 
   return (
     <div className={styles.page}>
@@ -260,7 +284,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         <div className={styles.headerInfo}>
           <span className={styles.playerName}>{ticket.player_name}</span>
           <span className={styles.gameMeta}>
-            Game #{game.game_number} · Booklet #{ticket.ticket_number ?? '—'}
+            Game #{game.game_number} · Tickets: #{ticket.selected_tickets?.join(', #') || 'Pending'}
           </span>
         </div>
         <div className={styles.headerRight}>
@@ -268,10 +292,10 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
             <button
               className="btn btn-sm"
               onClick={() => {
-                setSelectedNum(ticket.ticket_number || null);
+                setSelectedNums(ticket.selected_tickets || []);
                 setShowSelector(true);
               }}
-              title="Select different ticket number"
+              title="Select different ticket numbers"
             >
               🎟️ Change #
             </button>
@@ -287,49 +311,55 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         </div>
       </header>
 
-      {/* Ticket Booklet Selection Modal / View */}
+      {/* Ticket Selection Modal / View (1 to 66 pool) */}
       {showSelector && (
         <div className={styles.selectorModal}>
           <div className={styles.selectorCard}>
-            <h2 className={styles.selectorTitle}>CHOOSE YOUR LUCKY BOOKLET</h2>
+            <h2 className={styles.selectorTitle}>SELECT YOUR LUCKY TICKETS</h2>
             <p className={styles.selectorSubtitle}>
-              Select an available booklet number (1–50) for Game #{game.game_number}:
+              You have a <strong>{ticket.sheet_type.toUpperCase()} SHEET</strong>. Select any{' '}
+              <strong>{requiredCount} tickets</strong> from 1 to 66:
             </p>
 
-            <div className={styles.numberGrid}>
-              {Array.from({ length: 50 }, (_, i) => i + 1).map((n) => {
+            <div className={styles.selectionProgress}>
+              Selected: <strong>{selectedNums.length} / {requiredCount}</strong> tickets
+            </div>
+
+            <div className={styles.numberGrid66}>
+              {Array.from({ length: 66 }, (_, i) => i + 1).map((n) => {
                 const isTaken = takenNumbers.includes(n);
-                const isSelected = selectedNum === n;
+                const isSelected = selectedNums.includes(n);
                 return (
                   <button
                     key={n}
                     className={`${styles.numBtn} ${isSelected ? styles.numBtnSelected : ''} ${isTaken ? styles.numBtnTaken : ''}`}
-                    onClick={() => !isTaken && setSelectedNum(n)}
+                    onClick={() => toggleSelectNum(n)}
                     disabled={isTaken}
+                    title={isTaken ? `Ticket #${n} is SOLD` : `Select Ticket #${n}`}
                   >
-                    {isTaken ? `#{n} TAKEN` : `#${n}`}
+                    {isTaken ? `#${n} SOLD` : `#${n}`}
                   </button>
                 );
               })}
             </div>
 
             <div className={styles.selectorActions}>
-              {selectedNum ? (
-                <button
-                  className="btn btn-primary btn-lg"
-                  onClick={handleSelectBooklet}
-                  disabled={selecting}
-                  style={{ flex: 1 }}
-                >
-                  {selecting ? <span className="spinner" /> : `Lock In Booklet #${selectedNum}`}
-                </button>
-              ) : (
-                <button className="btn btn-lg" disabled style={{ flex: 1, opacity: 0.5 }}>
-                  Select a Number Above
-                </button>
-              )}
+              <button
+                className="btn btn-primary btn-lg"
+                onClick={handleLockTickets}
+                disabled={selecting || selectedNums.length !== requiredCount}
+                style={{ flex: 1 }}
+              >
+                {selecting ? (
+                  <span className="spinner" />
+                ) : selectedNums.length === requiredCount ? (
+                  `Lock In Tickets (#${selectedNums.join(', #')})`
+                ) : (
+                  `Select ${requiredCount - selectedNums.length} More Ticket${requiredCount - selectedNums.length > 1 ? 's' : ''}`
+                )}
+              </button>
 
-              {ticket.ticket_number !== null && (
+              {hasSelected && (
                 <button
                   className="btn"
                   onClick={() => setShowSelector(false)}
@@ -355,7 +385,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       {/* Waiting State */}
       {game.status === 'UPCOMING' && !showSelector && (
         <div className={styles.waitingBanner}>
-          <p>Your Booklet #{ticket.ticket_number} is locked & ready! Game will start soon.</p>
+          <p>Your tickets (#{ticket.selected_tickets?.join(', #')}) are locked & ready! Game will start soon.</p>
         </div>
       )}
 
@@ -371,8 +401,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         {tickets.map((t, tIndex) => {
           const tNums = t.flat().filter((n): n is number => n !== null);
           const calledOnT = tNums.filter((n) => calledSet.has(n)).length;
-          const bookNum = ticket.ticket_number ?? 1;
-          const ticketSerial = `${bookNum}0${tIndex + 1}`;
+          const ticketSerial = ticket.selected_tickets?.[tIndex] ?? (tIndex + 1);
 
           return (
             <div key={tIndex} className={styles.ticketCard}>

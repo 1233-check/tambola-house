@@ -570,3 +570,39 @@ export function validateFullSheet(tickets: TambolaTicket[]): { valid: boolean; e
 
   return { valid: errors.length === 0, errors };
 }
+
+/** Create a seeded PRNG from a string seed (e.g., gameId) */
+function createPRNG(seedStr: string): () => number {
+  let h = 1779033703 ^ seedStr.length;
+  for (let i = 0; i < seedStr.length; i++) {
+    h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Get the deterministic pool of 66 valid tickets for a game.
+ * 66 tickets = exactly 11 full sheets (11 x 6 = 66).
+ * Ticket #1 is pool[0], Ticket #66 is pool[65].
+ */
+export function getGameTicketsPool(gameId: string): TambolaTicket[] {
+  const rng = createPRNG(gameId);
+  const origRandom = Math.random;
+  Math.random = rng;
+  try {
+    const pool: TambolaTicket[] = [];
+    for (let s = 0; s < 11; s++) {
+      const sheet = generateSheet('full');
+      pool.push(...sheet.tickets);
+    }
+    return pool;
+  } finally {
+    Math.random = origRandom;
+  }
+}
+
