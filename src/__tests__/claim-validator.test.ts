@@ -19,16 +19,16 @@ const TICKET: TambolaTicket = [
 const ALL_TICKET_NUMBERS = [3, 12, 18, 25, 28, 34, 44, 49, 55, 62, 67, 71, 78, 85, 90];
 
 describe('Single Ticket Claim Validator', () => {
-  describe('Early Five', () => {
-    it('should be valid when 5 ticket numbers are called', () => {
-      const called = [3, 12, 25, 34, 44];
-      const result = validateClaim(TICKET, called, 'Early Five');
+  describe('Early Seven', () => {
+    it('should be valid when 7 ticket numbers are called', () => {
+      const called = [3, 12, 25, 34, 44, 18, 28];
+      const result = validateClaim(TICKET, called, 'Early Seven');
       expect(result.valid).toBe(true);
     });
 
-    it('should be invalid when less than 5 ticket numbers are called', () => {
-      const called = [3, 12, 25, 34];
-      const result = validateClaim(TICKET, called, 'Early Five');
+    it('should be invalid when less than 7 ticket numbers are called', () => {
+      const called = [3, 12, 25, 34, 44, 18];
+      const result = validateClaim(TICKET, called, 'Early Seven');
       expect(result.valid).toBe(false);
     });
   });

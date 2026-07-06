@@ -23,14 +23,10 @@ interface GameInfo {
   called_numbers: number[];
 }
 
-const PATTERNS = [
-  'Early Five',
-  'Top Line',
-  'Middle Line',
-  'Bottom Line',
-  'Four Corners',
-  'Full House',
-] as const;
+interface Winner {
+  playerName: string;
+  pattern: string;
+}
 
 export default function PlayerPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
@@ -38,12 +34,14 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
   const [game, setGame] = useState<GameInfo | null>(null);
   const [calledNumbers, setCalledNumbers] = useState<number[]>([]);
   const [markedNumbers, setMarkedNumbers] = useState<Set<number>>(new Set());
-  const [claimStatus, setClaimStatus] = useState<Record<string, { status: string; message: string }>>({});
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const prevNumberRef = useRef<number | null>(null);
+
+  // Winners list
+  const [winners, setWinners] = useState<Winner[]>([]);
 
   // Ticket Selection State
   const [showSelector, setShowSelector] = useState(false);
@@ -52,7 +50,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
   const [selectedStart, setSelectedStart] = useState<number | null>(null);
   const [selecting, setSelecting] = useState(false);
 
-  // Fetch ticket + game data + sold ticket numbers
+  // Fetch ticket + game data + existing winners
   const fetchData = useCallback(async () => {
     try {
       const { data: ticketData, error: ticketError } = await supabase
@@ -85,7 +83,18 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       setGame(gameData);
       setCalledNumbers(gameData.called_numbers || []);
 
-      // Fetch all sold ticket numbers in this game by other players
+      // Fetch existing winners (valid claims)
+      const { data: claims } = await supabase
+        .from('claims')
+        .select('pattern, player_name')
+        .eq('game_id', ticketData.game_id)
+        .eq('is_valid', true);
+
+      if (claims) {
+        setWinners(claims.map((c) => ({ playerName: c.player_name, pattern: c.pattern })));
+      }
+
+      // Fetch taken ticket numbers
       const { data: allTickets } = await supabase
         .from('tickets')
         .select('id, selected_tickets')
@@ -122,13 +131,26 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       })
       .on('broadcast', { event: 'claim_result' }, (payload) => {
         const p = payload.payload;
-        if (p) {
-          showToast(`${p.playerName}: ${p.pattern} — ${p.isValid ? '✓ Valid' : '✗ Invalid'}`);
+        if (p && p.isValid) {
+          // Add to winners list (avoid duplicates)
+          setWinners((prev) => {
+            const exists = prev.some((w) => w.pattern === p.pattern);
+            if (exists) return prev;
+            return [...prev, { playerName: p.playerName, pattern: p.pattern }];
+          });
+
+          // Show celebration toast
+          const isMe = ticket?.player_name === p.playerName;
+          showToast(
+            isMe
+              ? `🎉 YOU WON ${p.pattern}!`
+              : `🏆 ${p.playerName} won ${p.pattern}!`
+          );
         }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [ticket?.game_id]);
+  }, [ticket?.game_id, ticket?.player_name]);
 
   // Voice synthesis
   useEffect(() => {
@@ -148,7 +170,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
     }
   }, [calledNumbers, voiceEnabled]);
 
-  // Poll game status
+  // Poll game status + winners
   useEffect(() => {
     if (!ticket?.game_id) return;
     const interval = setInterval(async () => {
@@ -161,13 +183,23 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         setGame((prev) => prev ? { ...prev, status: data.status } : prev);
         setCalledNumbers(data.called_numbers || []);
       }
+
+      // Refresh winners
+      const { data: claims } = await supabase
+        .from('claims')
+        .select('pattern, player_name')
+        .eq('game_id', ticket.game_id)
+        .eq('is_valid', true);
+      if (claims) {
+        setWinners(claims.map((c) => ({ playerName: c.player_name, pattern: c.pattern })));
+      }
     }, 5000);
     return () => clearInterval(interval);
   }, [ticket?.game_id]);
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(''), 4000);
+    setTimeout(() => setToast(''), 5000);
   };
 
   const toggleMark = (num: number) => {
@@ -195,7 +227,6 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
     return Array.from({ length: ticketCount }, (_, i) => start + i);
   };
 
-  // Which tickets are highlighted (hovered or selected)
   const highlightedNums = new Set<number>();
   const activeStart = hoveredStart ?? selectedStart;
   if (activeStart !== null) {
@@ -224,29 +255,6 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       showToast('Network error');
     } finally {
       setSelecting(false);
-    }
-  };
-
-  const submitClaim = async (pattern: string) => {
-    if (!ticket) return;
-    setClaimStatus((prev) => ({ ...prev, [pattern]: { status: 'loading', message: '' } }));
-    try {
-      const res = await fetch('/api/claims', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: token, pattern }),
-      });
-      const data = await res.json();
-      setClaimStatus((prev) => ({
-        ...prev,
-        [pattern]: { status: data.valid ? 'valid' : 'invalid', message: data.message },
-      }));
-      showToast(data.message);
-    } catch {
-      setClaimStatus((prev) => ({
-        ...prev,
-        [pattern]: { status: 'error', message: 'Network error' },
-      }));
     }
   };
 
@@ -343,7 +351,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
             </div>
 
             <div className={styles.legend}>
-              <span><span className={styles.legendDot} style={{ background: '#ffffff' }} /> Available start</span>
+              <span><span className={styles.legendDot} style={{ background: '#ffffff' }} /> Available</span>
               <span><span className={styles.legendDot} style={{ background: '#ef4444', opacity: 0.4 }} /> Sold</span>
               <span><span className={styles.legendDot} style={{ background: '#333' }} /> Unavailable</span>
             </div>
@@ -396,6 +404,26 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         </div>
       )}
 
+      {/* Winners Board */}
+      {winners.length > 0 && (
+        <div className={styles.winnersBoard}>
+          <span className={styles.winnersTitle}>🏆 WINNERS</span>
+          <div className={styles.winnersList}>
+            {winners.map((w, i) => {
+              const isMe = w.playerName === ticket.player_name;
+              return (
+                <div key={i} className={`${styles.winnerRow} ${isMe ? styles.winnerRowMe : ''}`}>
+                  <span className={styles.winnerPattern}>{w.pattern}</span>
+                  <span className={styles.winnerName}>
+                    {isMe ? '⭐ YOU' : w.playerName}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Vertical Scrollable Tickets List */}
       <div className={styles.ticketsList}>
         {tickets.map((t, tIndex) => {
@@ -435,28 +463,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         })}
       </div>
 
-      {/* Sticky Claim Bar */}
-      {game.status === 'LIVE' && (
-        <div className={styles.claims}>
-          <span className={styles.claimsLabel}>CLAIM A PATTERN</span>
-          <div className={styles.claimGrid}>
-            {PATTERNS.map((p) => {
-              const cs = claimStatus[p];
-              return (
-                <button
-                  key={p}
-                  className={`${styles.claimBtn} ${cs?.status === 'valid' ? styles.claimWon : ''} ${cs?.status === 'invalid' ? styles.claimFailed : ''}`}
-                  onClick={() => submitClaim(p)}
-                  disabled={cs?.status === 'loading' || cs?.status === 'valid'}
-                >
-                  {cs?.status === 'loading' ? <span className="spinner" /> : p}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
+      {/* Toast */}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );

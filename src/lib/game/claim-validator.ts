@@ -49,14 +49,14 @@ function allCalled(numbers: number[], calledNumbers: Set<number>): boolean {
  * Each pattern defines which numbers on a single ticket must be marked.
  */
 export const PATTERNS = {
-  'Early Five': {
-    description: 'Any 5 numbers on a single ticket',
+  'Early Seven': {
+    description: 'Any 7 numbers on a single ticket',
     check: (ticket: TambolaTicket, called: Set<number>): boolean => {
       const ticketNums = getAllNumbers(ticket);
       let count = 0;
       for (const n of ticketNums) {
         if (called.has(n)) count++;
-        if (count >= 5) return true;
+        if (count >= 7) return true;
       }
       return false;
     },
@@ -208,10 +208,10 @@ export function getPatternProgress(
   const botRow = getRowNumbers(ticket, 2);
   const corners = getCornerNumbers(ticket);
   const all = getAllNumbers(ticket);
-  const earlyFiveMatched = Math.min(countMatched(all), 5);
+  const earlySevenMatched = Math.min(countMatched(all), 7);
 
   return {
-    'Early Five': { matched: earlyFiveMatched, total: 5, complete: earlyFiveMatched >= 5 },
+    'Early Seven': { matched: earlySevenMatched, total: 7, complete: earlySevenMatched >= 7 },
     'Top Line': { matched: countMatched(topRow), total: 5, complete: allCalled(topRow, called) },
     'Middle Line': { matched: countMatched(midRow), total: 5, complete: allCalled(midRow, called) },
     'Bottom Line': { matched: countMatched(botRow), total: 5, complete: allCalled(botRow, called) },
