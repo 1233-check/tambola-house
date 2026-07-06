@@ -289,6 +289,103 @@
   color: var(--error);
 }
 
+/* Booklet Selector Modal */
+.selectorModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  overflow-y: auto;
+}
+
+.selectorCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  max-width: 480px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.9);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.selectorTitle {
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  letter-spacing: 1px;
+  text-align: center;
+  color: #ffffff;
+}
+
+.selectorSubtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: -6px;
+}
+
+.numberGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0;
+}
+
+.numBtn {
+  padding: 12px 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.numBtn:hover:not(:disabled) {
+  border-color: #ffffff;
+  background: var(--bg-card-hover);
+  transform: translateY(-1px);
+}
+
+.numBtnSelected {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
+}
+
+.numBtnTaken {
+  opacity: 0.3;
+  cursor: not-allowed;
+  background: var(--bg-primary);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.65rem;
+}
+
+.selectorActions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
 /* Responsive */
 @media (max-width: 400px) {
   .ticketCell {

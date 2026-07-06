@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   player_phone TEXT NOT NULL DEFAULT '',
   sheet_type TEXT NOT NULL CHECK (sheet_type IN ('full', 'half')),
   ticket_data JSONB NOT NULL,
+  ticket_number INTEGER,
   access_token UUID NOT NULL DEFAULT gen_random_uuid() UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

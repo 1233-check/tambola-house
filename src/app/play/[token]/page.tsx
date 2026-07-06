@@ -12,6 +12,7 @@ interface TicketInfo {
   player_name: string;
   sheet_type: string;
   ticket_data: TambolaSheet;
+  ticket_number: number | null;
   access_token: string;
 }
 
@@ -44,10 +45,15 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
   const [toast, setToast] = useState('');
   const prevNumberRef = useRef<number | null>(null);
 
-  // Fetch ticket + game data
+  // Ticket Selection State
+  const [showSelector, setShowSelector] = useState(false);
+  const [takenNumbers, setTakenNumbers] = useState<number[]>([]);
+  const [selectedNum, setSelectedNum] = useState<number | null>(null);
+  const [selecting, setSelecting] = useState(false);
+
+  // Fetch ticket + game data + taken booklet numbers
   const fetchData = useCallback(async () => {
     try {
-      // Fetch ticket by access token
       const { data: ticketData, error: ticketError } = await supabase
         .from('tickets')
         .select('*')
@@ -60,7 +66,13 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       }
       setTicket(ticketData);
 
-      // Fetch game info (excludes number_sequence via select)
+      // If ticket_number is not yet chosen, show selection screen by default
+      if (ticketData.ticket_number === null || ticketData.ticket_number === undefined) {
+        setShowSelector(true);
+      } else {
+        setSelectedNum(ticketData.ticket_number);
+      }
+
       const { data: gameData, error: gameError } = await supabase
         .from('games')
         .select('id, game_number, status, called_numbers')
@@ -73,6 +85,18 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       }
       setGame(gameData);
       setCalledNumbers(gameData.called_numbers || []);
+
+      // Fetch taken booklet numbers for this game
+      const { data: allTickets } = await supabase
+        .from('tickets')
+        .select('id, ticket_number')
+        .eq('game_id', ticketData.game_id)
+        .not('ticket_number', 'is', null);
+
+      const taken = allTickets
+        ?.filter((t) => t.id !== ticketData.id && typeof t.ticket_number === 'number')
+        .map((t) => t.ticket_number!) || [];
+      setTakenNumbers(taken);
     } catch {
       setError('Failed to load. Please try again.');
     } finally {
@@ -156,6 +180,33 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
     });
   };
 
+  const handleSelectBooklet = async () => {
+    if (selectedNum === null || selecting) return;
+    setSelecting(true);
+    try {
+      const res = await fetch('/api/tickets/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accessToken: token,
+          ticketNumber: selectedNum,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ticket) {
+        setTicket(data.ticket);
+        setShowSelector(false);
+        showToast(data.message);
+      } else {
+        showToast(data.error || 'Failed to lock ticket number');
+      }
+    } catch {
+      showToast('Network error while selecting ticket');
+    } finally {
+      setSelecting(false);
+    }
+  };
+
   const submitClaim = async (pattern: string) => {
     if (!ticket) return;
     setClaimStatus((prev) => ({ ...prev, [pattern]: { status: 'loading', message: '' } }));
@@ -167,7 +218,6 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         body: JSON.stringify({
           accessToken: token,
           pattern,
-          // Omitting ticketIndex allows the server to automatically check all tickets in the sheet!
         }),
       });
       const data = await res.json();
@@ -209,9 +259,23 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       <header className={styles.header}>
         <div className={styles.headerInfo}>
           <span className={styles.playerName}>{ticket.player_name}</span>
-          <span className={styles.gameMeta}>Game #{game.game_number} · {tickets.length} Tickets</span>
+          <span className={styles.gameMeta}>
+            Game #{game.game_number} · Booklet #{ticket.ticket_number ?? '—'}
+          </span>
         </div>
         <div className={styles.headerRight}>
+          {game.status === 'UPCOMING' && (
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                setSelectedNum(ticket.ticket_number || null);
+                setShowSelector(true);
+              }}
+              title="Select different ticket number"
+            >
+              🎟️ Change #
+            </button>
+          )}
           <button
             className={styles.voiceBtn}
             onClick={() => setVoiceEnabled(!voiceEnabled)}
@@ -223,6 +287,62 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         </div>
       </header>
 
+      {/* Ticket Booklet Selection Modal / View */}
+      {showSelector && (
+        <div className={styles.selectorModal}>
+          <div className={styles.selectorCard}>
+            <h2 className={styles.selectorTitle}>CHOOSE YOUR LUCKY BOOKLET</h2>
+            <p className={styles.selectorSubtitle}>
+              Select an available booklet number (1–50) for Game #{game.game_number}:
+            </p>
+
+            <div className={styles.numberGrid}>
+              {Array.from({ length: 50 }, (_, i) => i + 1).map((n) => {
+                const isTaken = takenNumbers.includes(n);
+                const isSelected = selectedNum === n;
+                return (
+                  <button
+                    key={n}
+                    className={`${styles.numBtn} ${isSelected ? styles.numBtnSelected : ''} ${isTaken ? styles.numBtnTaken : ''}`}
+                    onClick={() => !isTaken && setSelectedNum(n)}
+                    disabled={isTaken}
+                  >
+                    {isTaken ? `#{n} TAKEN` : `#${n}`}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className={styles.selectorActions}>
+              {selectedNum ? (
+                <button
+                  className="btn btn-primary btn-lg"
+                  onClick={handleSelectBooklet}
+                  disabled={selecting}
+                  style={{ flex: 1 }}
+                >
+                  {selecting ? <span className="spinner" /> : `Lock In Booklet #${selectedNum}`}
+                </button>
+              ) : (
+                <button className="btn btn-lg" disabled style={{ flex: 1, opacity: 0.5 }}>
+                  Select a Number Above
+                </button>
+              )}
+
+              {ticket.ticket_number !== null && (
+                <button
+                  className="btn"
+                  onClick={() => setShowSelector(false)}
+                  disabled={selecting}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Current Number Banner (Sticky at top under header) */}
       {game.status === 'LIVE' && lastCalled && (
         <div className={styles.currentBanner}>
@@ -233,9 +353,9 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       )}
 
       {/* Waiting State */}
-      {game.status === 'UPCOMING' && (
+      {game.status === 'UPCOMING' && !showSelector && (
         <div className={styles.waitingBanner}>
-          <p>Your tickets are ready. Game will start soon.</p>
+          <p>Your Booklet #{ticket.ticket_number} is locked & ready! Game will start soon.</p>
         </div>
       )}
 
@@ -251,11 +371,13 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         {tickets.map((t, tIndex) => {
           const tNums = t.flat().filter((n): n is number => n !== null);
           const calledOnT = tNums.filter((n) => calledSet.has(n)).length;
+          const bookNum = ticket.ticket_number ?? 1;
+          const ticketSerial = `${bookNum}0${tIndex + 1}`;
 
           return (
             <div key={tIndex} className={styles.ticketCard}>
               <div className={styles.ticketHeader}>
-                <span className={styles.ticketTitle}>TICKET #{tIndex + 1}</span>
+                <span className={styles.ticketTitle}>TICKET #{ticketSerial}</span>
                 <span className={styles.ticketProgress}>
                   {calledOnT}/{tNums.length} called
                 </span>
