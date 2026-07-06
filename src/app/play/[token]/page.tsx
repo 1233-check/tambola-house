@@ -45,10 +45,11 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
   const [toast, setToast] = useState('');
   const prevNumberRef = useRef<number | null>(null);
 
-  // Ticket Selection State (1 to 66 pool)
+  // Ticket Selection State
   const [showSelector, setShowSelector] = useState(false);
   const [takenNumbers, setTakenNumbers] = useState<number[]>([]);
-  const [selectedNums, setSelectedNums] = useState<number[]>([]);
+  const [hoveredStart, setHoveredStart] = useState<number | null>(null);
+  const [selectedStart, setSelectedStart] = useState<number | null>(null);
   const [selecting, setSelecting] = useState(false);
 
   // Fetch ticket + game data + sold ticket numbers
@@ -66,12 +67,9 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       }
       setTicket(ticketData);
 
-      // Check if player has selected tickets yet
       const hasSelected = Array.isArray(ticketData.selected_tickets) && ticketData.selected_tickets.length > 0;
       if (!hasSelected) {
         setShowSelector(true);
-      } else {
-        setSelectedNums(ticketData.selected_tickets || []);
       }
 
       const { data: gameData, error: gameError } = await supabase
@@ -87,7 +85,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
       setGame(gameData);
       setCalledNumbers(gameData.called_numbers || []);
 
-      // Fetch all sold/taken ticket numbers (1-66) in this game by other players
+      // Fetch all sold ticket numbers in this game by other players
       const { data: allTickets } = await supabase
         .from('tickets')
         .select('id, selected_tickets')
@@ -110,10 +108,9 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Subscribe to Realtime for number calls
+  // Realtime subscription
   useEffect(() => {
     if (!ticket?.game_id) return;
-
     const channel = supabase
       .channel(`game:${ticket.game_id}`)
       .on('broadcast', { event: 'number_called' }, (payload) => {
@@ -130,7 +127,6 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         }
       })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [ticket?.game_id]);
 
@@ -140,7 +136,6 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
     const lastNum = calledNumbers[calledNumbers.length - 1];
     if (lastNum === prevNumberRef.current) return;
     prevNumberRef.current = lastNum;
-
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       const timer = setTimeout(() => {
         window.speechSynthesis.cancel();
@@ -153,7 +148,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
     }
   }, [calledNumbers, voiceEnabled]);
 
-  // Poll game status periodically
+  // Poll game status
   useEffect(() => {
     if (!ticket?.game_id) return;
     const interval = setInterval(async () => {
@@ -184,33 +179,37 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
     });
   };
 
-  const requiredCount = ticket?.sheet_type === 'half' ? 3 : 6;
+  // Consecutive block logic
+  const ticketCount = ticket?.sheet_type === 'half' ? 3 : 6;
+  const maxStart = 66 - ticketCount + 1;
+  const takenSet = new Set(takenNumbers);
 
-  const toggleSelectNum = (n: number) => {
-    if (takenNumbers.includes(n)) return;
-    setSelectedNums((prev) => {
-      if (prev.includes(n)) {
-        return prev.filter((item) => item !== n);
-      }
-      if (prev.length >= requiredCount) {
-        showToast(`You can only select exactly ${requiredCount} tickets!`);
-        return prev;
-      }
-      return [...prev, n].sort((a, b) => a - b);
-    });
+  const isStartAvailable = (start: number): boolean => {
+    for (let i = 0; i < ticketCount; i++) {
+      if (takenSet.has(start + i)) return false;
+    }
+    return true;
   };
 
+  const getBlockRange = (start: number): number[] => {
+    return Array.from({ length: ticketCount }, (_, i) => start + i);
+  };
+
+  // Which tickets are highlighted (hovered or selected)
+  const highlightedNums = new Set<number>();
+  const activeStart = hoveredStart ?? selectedStart;
+  if (activeStart !== null) {
+    getBlockRange(activeStart).forEach((n) => highlightedNums.add(n));
+  }
+
   const handleLockTickets = async () => {
-    if (selectedNums.length !== requiredCount || selecting) return;
+    if (selectedStart === null || selecting) return;
     setSelecting(true);
     try {
       const res = await fetch('/api/tickets/select', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accessToken: token,
-          selectedTickets: selectedNums,
-        }),
+        body: JSON.stringify({ accessToken: token, startAt: selectedStart }),
       });
       const data = await res.json();
       if (res.ok && data.ticket) {
@@ -219,11 +218,10 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         showToast(data.message);
       } else {
         showToast(data.error || 'Failed to lock tickets');
-        // Refresh taken numbers if conflict occurred
         fetchData();
       }
     } catch {
-      showToast('Network error while locking tickets');
+      showToast('Network error');
     } finally {
       setSelecting(false);
     }
@@ -232,15 +230,11 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
   const submitClaim = async (pattern: string) => {
     if (!ticket) return;
     setClaimStatus((prev) => ({ ...prev, [pattern]: { status: 'loading', message: '' } }));
-
     try {
       const res = await fetch('/api/claims', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accessToken: token,
-          pattern,
-        }),
+        body: JSON.stringify({ accessToken: token, pattern }),
       });
       const data = await res.json();
       setClaimStatus((prev) => ({
@@ -256,18 +250,8 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
     }
   };
 
-  if (loading) {
-    return <div className={styles.loadingPage}><span className="spinner" /></div>;
-  }
-
-  if (error) {
-    return (
-      <div className={styles.loadingPage}>
-        <p className={styles.errorText}>{error}</p>
-      </div>
-    );
-  }
-
+  if (loading) return <div className={styles.loadingPage}><span className="spinner" /></div>;
+  if (error) return <div className={styles.loadingPage}><p className={styles.errorText}>{error}</p></div>;
   if (!ticket || !game) return null;
 
   const sheet = ticket.ticket_data;
@@ -275,6 +259,8 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
   const calledSet = new Set(calledNumbers);
   const lastCalled = calledNumbers.length > 0 ? calledNumbers[calledNumbers.length - 1] : null;
   const hasSelected = Array.isArray(ticket.selected_tickets) && ticket.selected_tickets.length > 0;
+  const startNum = ticket.selected_tickets?.[0];
+  const endNum = ticket.selected_tickets?.[ticket.selected_tickets.length - 1];
 
   return (
     <div className={styles.page}>
@@ -283,20 +269,21 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         <div className={styles.headerInfo}>
           <span className={styles.playerName}>{ticket.player_name}</span>
           <span className={styles.gameMeta}>
-            Game #{game.game_number} · Tickets: #{ticket.selected_tickets?.join(', #') || 'Pending'}
+            Game #{game.game_number}
+            {hasSelected && ` · Tickets #${startNum}–#${endNum}`}
           </span>
         </div>
         <div className={styles.headerRight}>
-          {game.status === 'UPCOMING' && (
+          {game.status === 'UPCOMING' && hasSelected && (
             <button
               className="btn btn-sm"
               onClick={() => {
-                setSelectedNums(ticket.selected_tickets || []);
+                setSelectedStart(ticket.selected_tickets![0]);
                 setShowSelector(true);
               }}
               title="Change ticket selection"
             >
-              🎟️ Change #
+              🎟️ Change
             </button>
           )}
           <button
@@ -310,60 +297,74 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         </div>
       </header>
 
-      {/* Ticket Selection Modal / View (1 to 66 pool) */}
+      {/* Ticket Selection Modal */}
       {showSelector && (
         <div className={styles.selectorModal}>
           <div className={styles.selectorCard}>
-            <h2 className={styles.selectorTitle}>SELECT YOUR LUCKY TICKETS</h2>
+            <h2 className={styles.selectorTitle}>PICK YOUR TICKET ROW</h2>
             <p className={styles.selectorSubtitle}>
-              You have a <strong>{ticket.sheet_type.toUpperCase()} SHEET</strong>. Select any{' '}
-              <strong>{requiredCount} tickets</strong> from 1 to 66:
+              <strong>{ticket.sheet_type.toUpperCase()} SHEET</strong> — Select a starting number.
+              You will get <strong>{ticketCount} consecutive tickets</strong> in a row.
             </p>
 
-            <div className={styles.selectionProgress}>
-              Selected: <strong>{selectedNums.length} / {requiredCount}</strong> tickets
-            </div>
+            {selectedStart !== null && (
+              <div className={styles.selectionPreview}>
+                Your tickets: <strong>#{selectedStart}–#{selectedStart + ticketCount - 1}</strong>
+              </div>
+            )}
 
             <div className={styles.numberGrid66}>
               {Array.from({ length: 66 }, (_, i) => i + 1).map((n) => {
-                const isTaken = takenNumbers.includes(n);
-                const isSelected = selectedNums.includes(n);
+                const isTaken = takenSet.has(n);
+                const isValidStart = n <= maxStart && isStartAvailable(n);
+                const isHighlighted = highlightedNums.has(n);
+                const isSelected = selectedStart !== null && n >= selectedStart && n < selectedStart + ticketCount;
+
                 return (
                   <button
                     key={n}
-                    className={`${styles.numBtn} ${isSelected ? styles.numBtnSelected : ''} ${isTaken ? styles.numBtnTaken : ''}`}
-                    onClick={() => toggleSelectNum(n)}
-                    disabled={isTaken}
-                    title={isTaken ? `Ticket #${n} is SOLD` : `Select Ticket #${n}`}
+                    className={`${styles.numBtn} ${isSelected ? styles.numBtnSelected : ''} ${isHighlighted && !isSelected ? styles.numBtnHover : ''} ${isTaken ? styles.numBtnTaken : ''} ${!isTaken && !isValidStart ? styles.numBtnUnavailable : ''}`}
+                    onClick={() => isValidStart && !isTaken && setSelectedStart(n)}
+                    onMouseEnter={() => isValidStart && !isTaken && setHoveredStart(n)}
+                    onMouseLeave={() => setHoveredStart(null)}
+                    disabled={isTaken || !isValidStart}
+                    title={
+                      isTaken
+                        ? `#${n} SOLD`
+                        : isValidStart
+                          ? `Start here → #${n}–#${n + ticketCount - 1}`
+                          : `#${n} — Cannot start here`
+                    }
                   >
-                    {isTaken ? `#${n} SOLD` : `#${n}`}
+                    {n}
                   </button>
                 );
               })}
+            </div>
+
+            <div className={styles.legend}>
+              <span><span className={styles.legendDot} style={{ background: '#ffffff' }} /> Available start</span>
+              <span><span className={styles.legendDot} style={{ background: '#ef4444', opacity: 0.4 }} /> Sold</span>
+              <span><span className={styles.legendDot} style={{ background: '#333' }} /> Unavailable</span>
             </div>
 
             <div className={styles.selectorActions}>
               <button
                 className="btn btn-primary btn-lg"
                 onClick={handleLockTickets}
-                disabled={selecting || selectedNums.length !== requiredCount}
+                disabled={selecting || selectedStart === null}
                 style={{ flex: 1 }}
               >
                 {selecting ? (
                   <span className="spinner" />
-                ) : selectedNums.length === requiredCount ? (
-                  `Lock In Tickets (#${selectedNums.join(', #')})`
+                ) : selectedStart !== null ? (
+                  `Lock In #${selectedStart}–#${selectedStart + ticketCount - 1}`
                 ) : (
-                  `Select ${requiredCount - selectedNums.length} More Ticket${requiredCount - selectedNums.length > 1 ? 's' : ''}`
+                  'Tap a number to start'
                 )}
               </button>
-
               {hasSelected && (
-                <button
-                  className="btn"
-                  onClick={() => setShowSelector(false)}
-                  disabled={selecting}
-                >
+                <button className="btn" onClick={() => setShowSelector(false)} disabled={selecting}>
                   Cancel
                 </button>
               )}
@@ -372,7 +373,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         </div>
       )}
 
-      {/* Current Number Banner (Sticky at top under header) */}
+      {/* Current Number Banner */}
       {game.status === 'LIVE' && lastCalled && (
         <div className={styles.currentBanner}>
           <span className={styles.currentLabel}>CALLED</span>
@@ -381,14 +382,14 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         </div>
       )}
 
-      {/* Waiting State */}
+      {/* Waiting */}
       {game.status === 'UPCOMING' && !showSelector && (
         <div className={styles.waitingBanner}>
-          <p>Your tickets (#{ticket.selected_tickets?.join(', #')}) are locked & ready! Game will start soon.</p>
+          <p>Your tickets (#{startNum}–#{endNum}) are locked & ready! Game will start soon.</p>
         </div>
       )}
 
-      {/* Completed State */}
+      {/* Completed */}
       {game.status === 'COMPLETED' && (
         <div className={styles.waitingBanner}>
           <p>Game has ended. Thanks for playing!</p>
@@ -406,17 +407,13 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
             <div key={tIndex} className={styles.ticketCard}>
               <div className={styles.ticketHeader}>
                 <span className={styles.ticketTitle}>TICKET #{ticketSerial}</span>
-                <span className={styles.ticketProgress}>
-                  {calledOnT}/{tNums.length} called
-                </span>
+                <span className={styles.ticketProgress}>{calledOnT}/{tNums.length} called</span>
               </div>
               <div className={styles.ticketGrid}>
                 {t.map((row, ri) => (
                   <div key={ri} className={styles.ticketRow}>
                     {row.map((cell, ci) => {
-                      if (cell === null) {
-                        return <div key={ci} className={styles.ticketCellEmpty} />;
-                      }
+                      if (cell === null) return <div key={ci} className={styles.ticketCellEmpty} />;
                       const isCalled = calledSet.has(cell);
                       const isMarked = markedNumbers.has(cell);
                       return (
@@ -438,7 +435,7 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         })}
       </div>
 
-      {/* Sticky Claim Buttons Bar at Bottom */}
+      {/* Sticky Claim Bar */}
       {game.status === 'LIVE' && (
         <div className={styles.claims}>
           <span className={styles.claimsLabel}>CLAIM A PATTERN</span>
@@ -460,7 +457,6 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
         </div>
       )}
 
-      {/* Toast */}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
