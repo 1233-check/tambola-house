@@ -146,6 +146,9 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
               ? `🎉 YOU WON ${p.pattern}!`
               : `🏆 ${p.playerName} won ${p.pattern}!`
           );
+
+          // Voice announce the winner
+          announceWinner(p.playerName, p.pattern, isMe);
         }
       })
       .subscribe();
@@ -200,6 +203,22 @@ export default function PlayerPage({ params }: { params: Promise<{ token: string
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 5000);
+  };
+
+  const announceWinner = (playerName: string, pattern: string, isMe: boolean) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    // Short delay so it doesn't interrupt a number announcement
+    setTimeout(() => {
+      window.speechSynthesis.cancel();
+      const text = isMe
+        ? `Congratulations! You won ${pattern}!`
+        : `${playerName} won ${pattern}!`;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1.2;
+      utterance.volume = 1;
+      window.speechSynthesis.speak(utterance);
+    }, 600);
   };
 
   const toggleMark = (num: number) => {

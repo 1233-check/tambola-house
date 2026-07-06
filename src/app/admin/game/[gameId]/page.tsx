@@ -42,7 +42,8 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
   const [loading, setLoading] = useState(true);
   const [calling, setCalling] = useState(false);
   const [autoCall, setAutoCall] = useState(false);
-  const autoCallRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoCallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callingRef = useRef(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerPhone, setNewPlayerPhone] = useState('');
@@ -70,18 +71,43 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
     return () => clearInterval(interval);
   }, [fetchGame]);
 
-  // Auto-call interval
+  // Auto-call: chained setTimeout — next call only fires after previous completes
   useEffect(() => {
-    if (autoCall && game?.status === 'LIVE') {
-      autoCallRef.current = setInterval(() => {
-        handleCallNumber();
-      }, 4000);
-    }
+    if (!autoCall || game?.status !== 'LIVE') return;
+
+    let cancelled = false;
+
+    const callNext = async () => {
+      if (cancelled || callingRef.current) return;
+      callingRef.current = true;
+      setCalling(true);
+      try {
+        const res = await fetch(`/api/admin/games/${gameId}/call`, { method: 'POST' });
+        const data = await res.json();
+        if (data.completed) {
+          setAutoCall(false);
+          showToast('All 90 numbers called — game complete');
+        }
+        await fetchGame();
+      } catch { /* ignore */ } finally {
+        callingRef.current = false;
+        setCalling(false);
+      }
+      // Schedule the next call after a delay (only if not cancelled)
+      if (!cancelled) {
+        autoCallTimerRef.current = setTimeout(callNext, 3500);
+      }
+    };
+
+    // Start the chain
+    autoCallTimerRef.current = setTimeout(callNext, 500);
+
     return () => {
-      if (autoCallRef.current) clearInterval(autoCallRef.current);
+      cancelled = true;
+      if (autoCallTimerRef.current) clearTimeout(autoCallTimerRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoCall, game?.status]);
+  }, [autoCall, game?.status, gameId]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -108,7 +134,8 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
   };
 
   const handleCallNumber = async () => {
-    if (calling) return;
+    if (callingRef.current) return;
+    callingRef.current = true;
     setCalling(true);
     try {
       const res = await fetch(`/api/admin/games/${gameId}/call`, { method: 'POST' });
@@ -119,6 +146,7 @@ export default function GameManagementPage({ params }: { params: Promise<{ gameI
       }
       await fetchGame();
     } finally {
+      callingRef.current = false;
       setCalling(false);
     }
   };
